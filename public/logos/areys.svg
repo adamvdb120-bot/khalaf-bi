@@ -1,0 +1,29 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'>
+  <rect width='200' height='200' fill='white'/>
+  <!-- Sunburst rays -->
+  <g transform='translate(100,80)'>
+    <circle cx='0' cy='0' r='18' fill='none' stroke='#C9A84C' stroke-width='3'/>
+    <circle cx='0' cy='0' r='8' fill='#C9A84C'/>
+    <!-- 16 rays -->
+    <g stroke='#C9A84C' stroke-width='2.5'>
+      <line x1='0' y1='-23' x2='0' y2='-38'/>
+      <line x1='14.4' y1='-17.2' x2='23.8' y2='-28.4'/>
+      <line x1='23' y1='0' x2='38' y2='0'/>
+      <line x1='14.4' y1='17.2' x2='23.8' y2='28.4'/>
+      <line x1='0' y1='23' x2='0' y2='38'/>
+      <line x1='-14.4' y1='17.2' x2='-23.8' y2='28.4'/>
+      <line x1='-23' y1='0' x2='-38' y2='0'/>
+      <line x1='-14.4' y1='-17.2' x2='-23.8' y2='-28.4'/>
+      <line x1='10.2' y1='-20.7' x2='17' y2='-34.5'/>
+      <line x1='20.7' y1='-10.2' x2='34.5' y2='-17'/>
+      <line x1='20.7' y1='10.2' x2='34.5' y2='17'/>
+      <line x1='10.2' y1='20.7' x2='17' y2='34.5'/>
+      <line x1='-10.2' y1='20.7' x2='-17' y2='34.5'/>
+      <line x1='-20.7' y1='10.2' x2='-34.5' y2='17'/>
+      <line x1='-20.7' y1='-10.2' x2='-34.5' y2='-17'/>
+      <line x1='-10.2' y1='-20.7' x2='-17' y2='-34.5'/>
+    </g>
+  </g>
+  <text x='100' y='140' text-anchor='middle' font-family='Georgia,serif' font-size='22' font-weight='bold' fill='#1a1a1a' letter-spacing='3'>AREYS</text>
+  <text x='100' y='160' text-anchor='middle' font-family='Georgia,serif' font-size='9' fill='#555' letter-spacing='2'>SOMALI RESTAURANT</text>
+</svg>

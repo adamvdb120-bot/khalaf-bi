@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160" width="400" height="160">
+  <rect width="400" height="160" fill="white"/>
+
+  <!-- Arabic text: مركز قباء -->
+  <text x="200" y="90" text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="68" font-weight="bold"
+    fill="#7B1C1C"
+    letter-spacing="4">&#x645;&#x631;&#x643;&#x632; &#x642;&#x628;&#x627;&#x621;</text>
+
+  <!-- Gold accent dots -->
+  <ellipse cx="148" cy="32" rx="9" ry="6" fill="#C9A84C" transform="rotate(-15,148,32)"/>
+  <ellipse cx="195" cy="26" rx="9" ry="6" fill="#C9A84C" transform="rotate(0,195,26)"/>
+  <ellipse cx="242" cy="32" rx="9" ry="6" fill="#C9A84C" transform="rotate(15,242,32)"/>
+
+  <!-- Subtitle -->
+  <text x="200" y="135" text-anchor="middle"
+    font-family="'Segoe UI', Arial, sans-serif"
+    font-size="22" fill="#1B7A8C" letter-spacing="1">Islamitisch Centrum Quba</text>
+</svg>
