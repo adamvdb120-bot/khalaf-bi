@@ -221,8 +221,10 @@ Regels voor charts:
         { role: "system", content: systemPrompt },
         { role: "user", content: question },
       ],
-      max_tokens: 2048,
-      temperature: 0.3,
+      max_tokens: 4096,
+      temperature: 0.2,
+      // JSON mode dwingt Llama om altijd valide JSON terug te geven
+      response_format: { type: "json_object" },
     });
 
     const text = completion.choices[0]?.message?.content ?? "";
