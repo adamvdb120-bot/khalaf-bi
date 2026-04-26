@@ -2,9 +2,30 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-// In-memory cache — 30 minuten geldig, gereset bij "Vernieuwen"
-const dataCache = new Map<string, { data: unknown; cachedAt: number }>();
-const CACHE_TTL = 30 * 60 * 1000;
+// Cache TTL — data wordt 's nachts ververst via cron, anders na 60 min als de cron miste
+const CACHE_TTL_MS = 60 * 60 * 1000;
+
+async function readCache(admin: ReturnType<typeof createAdminClient>, cacheKey: string) {
+  const { data } = await admin
+    .from("exact_data_cache")
+    .select("data, updated_at")
+    .eq("client_name", "attiva")
+    .eq("cache_key", cacheKey)
+    .single();
+  if (!data) return null;
+  const age = Date.now() - new Date(data.updated_at).getTime();
+  if (age > CACHE_TTL_MS) return null;
+  return { data: data.data, ageSeconds: Math.round(age / 1000) };
+}
+
+async function writeCache(admin: ReturnType<typeof createAdminClient>, cacheKey: string, data: unknown) {
+  await admin.from("exact_data_cache").upsert({
+    client_name: "attiva",
+    cache_key: cacheKey,
+    data,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "client_name,cache_key" });
+}
 
 async function refreshExactToken(admin: ReturnType<typeof createAdminClient>, row: Record<string, string>) {
   const res = await fetch("https://start.exactonline.nl/api/oauth2/token", {
@@ -131,9 +152,15 @@ function buildOmzetPerKlant(facturen: unknown[] | null) {
 }
 
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  // Cron-jobs mogen ook binnen (met geheim) — anders moet user ingelogd zijn
+  const cronSecret = req.headers.get("x-cron-secret");
+  const isCron = cronSecret === process.env.CRON_SECRET && cronSecret !== undefined;
+
+  if (!isCron) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  }
 
   const admin = createAdminClient();
   // Eén token ophalen voor alle calls — vermijdt race condition bij parallelle requests
@@ -153,13 +180,13 @@ export async function GET(req: Request) {
   const debug = url.searchParams.get("debug") === "1";
   const forceRefresh = url.searchParams.get("refresh") === "1";
 
-  // Cache check (niet voor debug requests)
-  const cacheKey = `attiva-${jaar}-${jaarVorig ?? "none"}`;
+  // Cache check (niet voor debug requests) — leest uit Supabase
+  const cacheKey = `${jaar}-${jaarVorig ?? "none"}`;
   if (!debug && !forceRefresh) {
-    const cached = dataCache.get(cacheKey);
-    if (cached && Date.now() - cached.cachedAt < CACHE_TTL) {
+    const cached = await readCache(admin, cacheKey);
+    if (cached) {
       return NextResponse.json(cached.data, {
-        headers: { "X-Cache": "HIT", "X-Cache-Age": String(Math.round((Date.now() - cached.cachedAt) / 1000)) },
+        headers: { "X-Cache": "HIT", "X-Cache-Age": String(cached.ageSeconds) },
       });
     }
   }
@@ -238,8 +265,10 @@ export async function GET(req: Request) {
     ? { huidig: huidigeData, vorig: { division, jaar: jaarVorig, pl: buildPl(balancesVorig), debiteuren: [], crediteuren: [], omzetPerKlant: [] } }
     : huidigeData;
 
-  // Sla op in cache
-  dataCache.set(cacheKey, { data: responseData, cachedAt: Date.now() });
+  // Sla op in Supabase cache
+  if (!debug) {
+    await writeCache(admin, cacheKey, responseData);
+  }
 
   return NextResponse.json(responseData, { headers: { "X-Cache": "MISS" } });
 }
