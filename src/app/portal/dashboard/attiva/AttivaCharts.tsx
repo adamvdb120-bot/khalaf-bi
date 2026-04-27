@@ -147,6 +147,9 @@ export default function AttivaCharts() {
         <DownloadPDFButton
           targetId="attiva-financieel-export"
           filename={`Attiva-Zorg-Financieel-${jaar}`}
+          clientName="Attiva Zorg"
+          reportType="Financieel overzicht"
+          jaar={jaar}
           label="PDF"
         />
       </div>

@@ -92,6 +92,9 @@ export default function DeclaratiesSection() {
         <DownloadPDFButton
           targetId="attiva-declaraties-export"
           filename={`Attiva-Zorg-Declaraties-${jaar}`}
+          clientName="Attiva Zorg"
+          reportType="Declaratieoverzicht"
+          jaar={jaar}
           label="PDF"
         />
       </div>
