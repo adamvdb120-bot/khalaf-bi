@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/refresh-exact",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/send-monthly-reports",
+      "schedule": "0 8 1 * *"
     }
   ]
 }
