@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Euro, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
+import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface Debiteur { Name: string; Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number }
@@ -143,6 +144,11 @@ export default function AttivaCharts() {
           className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
           <RefreshCw size={12} /> Vernieuwen
         </button>
+        <DownloadPDFButton
+          targetId="attiva-financieel-export"
+          filename={`Attiva-Zorg-Financieel-${jaar}`}
+          label="PDF"
+        />
       </div>
     </div>
   );
@@ -286,6 +292,7 @@ export default function AttivaCharts() {
     <div className="space-y-6">
       {jaarSelector}
 
+      <div id="attiva-financieel-export" className="space-y-6 bg-white">
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-5">
         {/* Omzet */}
@@ -498,6 +505,8 @@ export default function AttivaCharts() {
           <p>Geen financiële data gevonden voor {data.jaar} in Exact Online.</p>
         </div>
       )}
+
+      </div>
 
       {maandData.length > 0 && <DashboardChat context={chatContext} />}
     </div>

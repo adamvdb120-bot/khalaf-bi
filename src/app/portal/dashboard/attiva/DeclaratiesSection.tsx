@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { RefreshCw, AlertCircle, Users, Wallet, Heart } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
+import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 
 interface DeclaratieData {
   totaal: number;
@@ -83,10 +84,17 @@ export default function DeclaratiesSection() {
           ))}
         </div>
       </div>
-      <button onClick={() => load(jaar)}
-        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
-        <RefreshCw size={12} /> Vernieuwen
-      </button>
+      <div className="flex items-center gap-2">
+        <button onClick={() => load(jaar)}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+          <RefreshCw size={12} /> Vernieuwen
+        </button>
+        <DownloadPDFButton
+          targetId="attiva-declaraties-export"
+          filename={`Attiva-Zorg-Declaraties-${jaar}`}
+          label="PDF"
+        />
+      </div>
     </div>
   );
 
@@ -158,6 +166,7 @@ export default function DeclaratiesSection() {
     <div className="space-y-6">
       {header}
 
+      <div id="attiva-declaraties-export" className="space-y-6 bg-white">
       {/* KPI cards */}
       <div className="grid grid-cols-3 gap-5">
         <div className="card border-t-4 border-t-navy-700">
@@ -337,6 +346,8 @@ export default function DeclaratiesSection() {
           </div>
         </div>
       )}
+
+      </div>
 
       <DashboardChat context={chatContext} />
     </div>
