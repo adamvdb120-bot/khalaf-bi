@@ -53,10 +53,8 @@ export default function Hero() {
             </h1>
 
             <p className="text-xl text-navy-200 mb-4 leading-relaxed">
-              Jouw data bestaat al. Wij maken het zichtbaar. Khalaf BI koppelt
-              je boekhouding, kassasysteem en declaraties aan één helder
-              dashboard zodat je altijd, realtime ziet hoe je bedrijf
-              ervoor staat.
+              Khalaf BI koppelt alle systemen die je nodig hebt en brengt de
+              data samen, zodat de inzichten eindelijk zichtbaar worden.
             </p>
 
             <div className="flex flex-col gap-2 mb-8">
