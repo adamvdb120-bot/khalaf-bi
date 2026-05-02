@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Quote, ArrowRight } from "lucide-react";
+import { Quote, ArrowRight, Clock, TrendingUp } from "lucide-react";
 
 const cases = [
   {
@@ -8,9 +8,12 @@ const cases = [
     role: "Somali Restaurant",
     logo: "/logos/areys.svg",
     quote:
-      "Ik was vroeger 30 uur per maand bezig met cijfers verzamelen uit drie systemen. Nu zie ik alles op één scherm. Ik kan nu per dag zien wat er overblijft en wanneer ik kan investeren.",
+      "Ik was vroeger 30 uur per maand bezig met cijfers verzamelen uit drie systemen. Nu zie ik alles op één scherm — per dag wat er overblijft en wanneer ik kan investeren.",
     kpis: ["Omzet per dag", "Brutomarge", "Personeelskosten", "Menuanalyse"],
+    result: "30 uur bespaard per maand",
+    resultIcon: Clock,
     color: "bg-amber-50 border-amber-200",
+    resultColor: "bg-amber-100 text-amber-700",
   },
   {
     sector: "Zorg",
@@ -18,9 +21,12 @@ const cases = [
     role: "Zorginstelling",
     logo: "/logos/attiva.svg",
     quote:
-      "Per cliënt weet ik nu direct hoeveel PGB-budget er nog beschikbaar is en hoeveel er gedeclareerd is. Dit geeft rust en ik kan nu vooruit plannen in plaats van achteraf constateren.",
+      "Per cliënt weet ik nu direct hoeveel PGB-budget er nog beschikbaar is en hoeveel er gedeclareerd is. Ik kan vooruit plannen in plaats van achteraf constateren.",
     kpis: ["PGB-budget per cliënt", "Declaraties", "Openstaande posten", "Cashflow"],
+    result: "100% inzicht in declaraties",
+    resultIcon: TrendingUp,
     color: "bg-teal-50 border-teal-200",
+    resultColor: "bg-teal-100 text-teal-700",
   },
 ];
 
@@ -33,11 +39,11 @@ export default function Cases() {
             Praktijkcases
           </span>
           <h2 className="text-4xl font-bold text-navy-700 mt-3 mb-4">
-            Resultaten die spreken
+            Ondernemers die u voor gingen
           </h2>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-            Ondernemers in horeca en zorg gingen u voor. Zie hoe Khalaf BI hun
-            besluitvorming heeft verbeterd.
+            Van horeca tot zorg — zie hoe Khalaf BI zorgt voor minder stress
+            en betere beslissingen.
           </p>
         </div>
 
@@ -45,8 +51,9 @@ export default function Cases() {
           {cases.map((c) => (
             <div
               key={c.name}
-              className={`rounded-2xl border-2 p-8 ${c.color} hover:shadow-lg transition-shadow duration-300`}
+              className={`rounded-2xl border-2 p-8 ${c.color} hover:shadow-lg transition-all duration-300 hover:-translate-y-1`}
             >
+              {/* Header */}
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-gray-100 flex-shrink-0 flex items-center justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -61,16 +68,21 @@ export default function Cases() {
                 </span>
               </div>
 
+              {/* Resultaat badge */}
+              <div className={`inline-flex items-center gap-2 ${c.resultColor} text-xs font-bold px-3 py-1.5 rounded-full mb-5`}>
+                <c.resultIcon size={12} />
+                {c.result}
+              </div>
+
+              {/* Quote */}
               <div className="relative mb-6">
-                <Quote
-                  size={32}
-                  className="text-gray-200 absolute -top-2 -left-1"
-                />
+                <Quote size={32} className="text-gray-200 absolute -top-2 -left-1" />
                 <p className="text-gray-700 leading-relaxed pl-6 italic">
                   &ldquo;{c.quote}&rdquo;
                 </p>
               </div>
 
+              {/* KPI tags */}
               <div>
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                   Dashboard KPI&apos;s
@@ -89,12 +101,13 @@ export default function Cases() {
             </div>
           ))}
         </div>
+
         <div className="text-center">
           <Link
             href="/klanten"
             className="inline-flex items-center gap-2 text-navy-700 font-semibold hover:text-gold-500 transition-colors"
           >
-            Bekijk de volledige praktijkcases <ArrowRight size={16} />
+            Bekijk alle praktijkcases <ArrowRight size={16} />
           </Link>
         </div>
       </div>

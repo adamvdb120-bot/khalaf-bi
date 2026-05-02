@@ -1,45 +1,45 @@
-import { Database, LayoutDashboard, Link2, ShieldCheck, Smartphone, Users } from "lucide-react";
+import { Database, LayoutDashboard, Link2, ShieldCheck, Smartphone, BrainCircuit } from "lucide-react";
 
 const features = [
   {
     icon: Database,
-    title: "Data-integratie",
-    desc: "Wij koppelen uw boekhouding (Exact Online), kassasysteem (Lightspeed), CRM en Excel-bestanden aan één centrale databron.",
+    title: "Alles op één plek",
+    desc: "Exact Online, Lightspeed, Excel — wij koppelen al uw bronsystemen aan één centrale databron. Geen losse bestanden meer.",
     accent: "bg-blue-50 text-blue-600",
     border: "border-t-blue-500",
   },
   {
     icon: LayoutDashboard,
-    title: "Maatwerk dashboards",
-    desc: "Overzichtelijke en interactieve dashboards met realtime KPI's. Filter op periode, afdeling of product met één klik.",
+    title: "Dashboard op maat",
+    desc: "Interactieve KPI-dashboards die precies laten zien wat voor ú belangrijk is. Filter op periode, afdeling of locatie.",
     accent: "bg-gold-500/10 text-gold-600",
     border: "border-t-gold-500",
   },
   {
-    icon: Link2,
-    title: "KPI-framework op maat",
-    desc: "Wij definiëren samen met u welke KPI's er écht toe doen voor uw bedrijf. Geen losse cijfers, maar één versie van de waarheid.",
+    icon: BrainCircuit,
+    title: "AI-assistent inbegrepen",
+    desc: "Stel gewoon een vraag in het Nederlands: \"Hoe was mijn marge vorige maand?\" De AI analyseert uw data en antwoordt direct.",
     accent: "bg-violet-50 text-violet-600",
     border: "border-t-violet-500",
   },
   {
     icon: Smartphone,
-    title: "Altijd en overal inzicht",
-    desc: "Uw dashboard is beschikbaar via de browser op uw laptop, tablet of telefoon. Geen installatie nodig.",
+    title: "Overal bereikbaar",
+    desc: "Uw dashboard werkt op laptop, tablet en telefoon — zonder installatie. Altijd en overal de laatste cijfers bij de hand.",
     accent: "bg-emerald-50 text-emerald-600",
     border: "border-t-emerald-500",
   },
   {
-    icon: Users,
-    title: "Persoonlijke begeleiding",
-    desc: "Van intake tot livegang. Wij begeleiden u intensief en bieden maandelijkse check-ins voor optimalisatie.",
+    icon: Link2,
+    title: "KPI-framework op maat",
+    desc: "Samen bepalen we welke cijfers er écht toe doen voor uw bedrijf. Geen ruis, geen overbodige grafieken — alleen wat telt.",
     accent: "bg-teal-50 text-teal-600",
     border: "border-t-teal-500",
   },
   {
     icon: ShieldCheck,
     title: "Veilig en betrouwbaar",
-    desc: "Uw data is afgeschermd achter beveiligde login. Wij werken met enterprise-cloudinfrastructuur en strikte toegangsbeheer.",
+    desc: "Uw data is afgeschermd achter een beveiligde login. Wij werken met enterprise-cloudinfrastructuur en strikte toegangscontrole.",
     accent: "bg-navy-700/10 text-navy-700",
     border: "border-t-navy-700",
   },
@@ -51,14 +51,14 @@ export default function Features() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <span className="text-gold-500 font-semibold text-sm uppercase tracking-widest">
-            Wat wij doen
+            Wat u krijgt
           </span>
           <h2 className="text-4xl font-bold text-navy-700 mt-3 mb-4">
-            Alles voor datagedreven beslissingen
+            Eén platform. Alle inzichten.
           </h2>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-            Van data-integratie tot live dashboard — wij leveren een complete
-            BI-oplossing die direct bruikbaar is voor uw dagelijkse sturing.
+            Van data-integratie tot AI-analyse — Khalaf BI levert een complete
+            oplossing die direct bruikbaar is voor uw dagelijkse sturing.
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export default function Features() {
           {features.map((f) => (
             <div
               key={f.title}
-              className={`bg-white rounded-2xl border border-gray-100 border-t-4 ${f.border} p-7 shadow-sm hover:shadow-md transition-shadow duration-300`}
+              className={`bg-white rounded-2xl border border-gray-100 border-t-4 ${f.border} p-7 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1`}
             >
               <div className={`w-12 h-12 ${f.accent} rounded-xl flex items-center justify-center mb-5`}>
                 <f.icon size={22} />
