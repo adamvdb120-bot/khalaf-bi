@@ -122,7 +122,7 @@ export default function DashboardChat({ uploadId, uploadIds, context }: { upload
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      text: "Hallo! Ik ben uw BI-assistent. Stel mij een vraag over uw data — ik analyseer het en maak automatisch een grafiek als dat nuttig is.",
+      text: "Hallo! Ik ben je BI-assistent. Stel een vraag over je data — ik analyseer het en maak automatisch een grafiek als dat nuttig is.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -241,7 +241,7 @@ export default function DashboardChat({ uploadId, uploadIds, context }: { upload
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send(input)}
-          placeholder="Stel een vraag over uw data..."
+          placeholder="Stel een vraag over je data..."
           className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700/20 focus:border-navy-700 transition"
           disabled={loading}
         />

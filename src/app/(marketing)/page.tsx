@@ -26,12 +26,12 @@ export default function HomePage() {
             Klaar voor de volgende stap?
           </span>
           <h2 className="text-4xl lg:text-5xl font-bold text-white mb-5 leading-tight">
-            Uw data werkt voor u.<br />
+            Je data werkt voor jou.<br />
             <span className="text-gold-400">Niet andersom.</span>
           </h2>
           <p className="text-navy-200 text-lg mb-10 leading-relaxed">
-            Vraag een gratis demo aan. Wij laten u zien hoe uw dashboard
-            eruitziet — op basis van uw eigen cijfers. Geen verplichtingen.
+            Vraag een gratis demo aan. Wij laten je zien hoe jouw dashboard
+            eruitziet op basis van je eigen cijfers. Geen verplichtingen.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link

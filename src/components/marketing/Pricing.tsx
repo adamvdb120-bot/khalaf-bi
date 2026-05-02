@@ -27,11 +27,11 @@ const plans = [
     features: [
       "Tot 3 gekoppelde bronsystemen",
       "KPI-sessie op maat",
-      "Maatwerk dashboard in Power BI",
+      "Maatwerk dashboard",
       "2× maandelijkse optimalisatie",
       "Prioriteit support",
       "Toegang klantportaal",
-      "Demo voor uw team",
+      "Demo voor je team",
     ],
     cta: "Start met Groei",
     highlight: true,
@@ -68,7 +68,7 @@ export default function Pricing() {
           </h2>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto">
             Een eenmalige implementatiefee en een laag maandabonnement voor
-            onderhoud, hosting en support.
+            onderhoud, hosting en support. Geen verrassingen.
           </p>
         </div>
 
@@ -90,61 +90,32 @@ export default function Pricing() {
                 </div>
               )}
 
-              <h3
-                className={`text-xl font-bold mb-1 ${
-                  plan.highlight ? "text-white" : "text-navy-700"
-                }`}
-              >
+              <h3 className={`text-xl font-bold mb-1 ${plan.highlight ? "text-white" : "text-navy-700"}`}>
                 {plan.name}
               </h3>
-              <p
-                className={`text-sm mb-6 ${
-                  plan.highlight ? "text-navy-200" : "text-gray-500"
-                }`}
-              >
+              <p className={`text-sm mb-6 ${plan.highlight ? "text-navy-200" : "text-gray-500"}`}>
                 {plan.desc}
               </p>
 
               <div className="mb-1">
-                <span
-                  className={`text-4xl font-bold ${
-                    plan.highlight ? "text-gold-400" : "text-navy-700"
-                  }`}
-                >
+                <span className={`text-4xl font-bold ${plan.highlight ? "text-gold-400" : "text-navy-700"}`}>
                   {plan.price}
                 </span>
                 {plan.period && (
-                  <span
-                    className={`text-sm ml-2 ${
-                      plan.highlight ? "text-navy-300" : "text-gray-400"
-                    }`}
-                  >
+                  <span className={`text-sm ml-2 ${plan.highlight ? "text-navy-300" : "text-gray-400"}`}>
                     {plan.period}
                   </span>
                 )}
               </div>
-              <div
-                className={`text-sm mb-8 font-medium ${
-                  plan.highlight ? "text-gold-400" : "text-gray-500"
-                }`}
-              >
+              <div className={`text-sm mb-8 font-medium ${plan.highlight ? "text-gold-400" : "text-gray-500"}`}>
                 {plan.sub}
               </div>
 
               <ul className="space-y-3 mb-8">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-3">
-                    <Check
-                      size={16}
-                      className={`mt-0.5 flex-shrink-0 ${
-                        plan.highlight ? "text-gold-400" : "text-navy-700"
-                      }`}
-                    />
-                    <span
-                      className={`text-sm ${
-                        plan.highlight ? "text-navy-100" : "text-gray-600"
-                      }`}
-                    >
+                    <Check size={16} className={`mt-0.5 flex-shrink-0 ${plan.highlight ? "text-gold-400" : "text-navy-700"}`} />
+                    <span className={`text-sm ${plan.highlight ? "text-navy-100" : "text-gray-600"}`}>
                       {f}
                     </span>
                   </li>

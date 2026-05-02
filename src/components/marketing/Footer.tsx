@@ -20,8 +20,8 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-navy-300 text-sm leading-relaxed max-w-xs">
-              Geïntegreerde BI-oplossingen voor MKB-ondernemers. Eén centrale
-              plek voor al uw data, KPI&apos;s en besluitvorming.
+              Geïntegreerde BI-oplossingen voor MKB-ondernemers. Jouw data
+              bestaat al. Wij maken het zichtbaar.
             </p>
             <div className="flex gap-3 mt-5">
               <a

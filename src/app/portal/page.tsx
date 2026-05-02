@@ -51,7 +51,7 @@ export default async function PortalHomePage() {
           <p className="text-gray-400 mt-1 text-sm">
             {upload
               ? `Dashboard op basis van: ${upload.name} · ${new Date(upload.created_at).toLocaleDateString("nl-NL")}`
-              : "Upload uw eerste databestand om het dashboard te vullen."}
+              : "Upload je eerste databestand om het dashboard te vullen."}
           </p>
         </div>
         <Link href="/portal/data-uploaden" className="btn-primary flex items-center gap-2 text-sm">
@@ -68,7 +68,7 @@ export default async function PortalHomePage() {
             uploadName={upload.name}
           />
           <div className="mt-8">
-            <h2 className="text-xl font-bold text-navy-700 mb-4">BI Assistent — Stel een vraag over uw data</h2>
+            <h2 className="text-xl font-bold text-navy-700 mb-4">BI Assistent — Stel een vraag over je data</h2>
             <DashboardChat uploadId={upload.id} />
           </div>
         </>
@@ -79,7 +79,7 @@ export default async function PortalHomePage() {
           </div>
           <h3 className="text-xl font-bold text-navy-700 mb-2">Nog geen data</h3>
           <p className="text-gray-400 max-w-sm mb-6">
-            Upload een Excel of CSV bestand om uw dashboard automatisch te vullen met grafieken en KPI&apos;s.
+            Upload een Excel of CSV bestand om je dashboard automatisch te vullen met grafieken en KPI&apos;s.
           </p>
           <Link href="/portal/data-uploaden" className="btn-primary">
             Eerste bestand uploaden
