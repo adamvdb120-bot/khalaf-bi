@@ -32,9 +32,9 @@ export default function Hero() {
             </div>
 
             <h1 className="text-5xl lg:text-6xl font-bold text-white leading-[1.1] mb-6">
-              Stop met gissen.{" "}
+              Grip op je{" "}
               <span className="text-gold-400 relative">
-                Begin met groeien.
+                cijfers.
                 <svg
                   className="absolute -bottom-2 left-0 w-full"
                   viewBox="0 0 300 8"
@@ -53,9 +53,10 @@ export default function Hero() {
             </h1>
 
             <p className="text-xl text-navy-200 mb-4 leading-relaxed">
-              Geen losse Excel-bestanden meer. Khalaf BI koppelt uw boekhouding,
-              kassasysteem en declaraties aan één helder dashboard — zodat u
-              altijd, realtime ziet hoe uw bedrijf ervoor staat.
+              Jouw data bestaat al. Wij maken het zichtbaar. Khalaf BI koppelt
+              je boekhouding, kassasysteem en declaraties aan één helder
+              dashboard — zodat je altijd, realtime ziet hoe je bedrijf
+              ervoor staat.
             </p>
 
             <div className="flex flex-col gap-2 mb-8">
