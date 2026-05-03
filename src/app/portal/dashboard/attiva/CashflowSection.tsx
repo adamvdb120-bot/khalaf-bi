@@ -420,21 +420,24 @@ export default function CashflowSection() {
           ...(slechteMaand ? [`Zwaarste maand qua cashflow: ${slechteMaand.maand} (${euro(slechteMaand.netto)})`] : []),
           ...(declaraties ? [
             ``,
-            `--- DECLARATIEOVERZICHT (wat gedeclareerd/uitbetaald is via SVB/PGB) ---`,
-            `BELANGRIJK: "Declaraties" = wat uitbetaald is via SVB/PGB budgetten. "Cashflow inkomsten" = wat daadwerkelijk op de bankrekening binnenkwam. Als declaraties hoger zijn dan cashflow inkomsten, zijn er nog openstaande betalingen.`,
+            `--- DECLARATIEOVERZICHT (SVB/PGB uitbetalingen) ---`,
+            `BELANGRIJK voor vergelijking:`,
+            `- "Cashflow inkomsten" = wat daadwerkelijk op de bankrekening binnenkwam (Exact Online)`,
+            `- "Declaraties" = wat uitbetaald is via SVB/PGB budgetten`,
+            `- Als declaraties > ontvangen: er zijn vertraagde of openstaande betalingen`,
+            `- Als ontvangen > declaraties: er zijn andere inkomstenbronnen naast PGB`,
             ``,
             `Totaal gedeclareerd/uitbetaald ${jaar}: ${euro(declaraties.totaal)}`,
-            `Totaal daadwerkelijk ontvangen (cashflow) ${jaar}: ${euro(totaalInkomsten)}`,
-            `Verschil (openstaand/timing): ${euro(declaraties.totaal - totaalInkomsten)}`,
+            `Totaal daadwerkelijk ontvangen cashflow ${jaar}: ${euro(totaalInkomsten)}`,
+            `Totaalverschil: ${declaraties.totaal > totaalInkomsten ? `€${Math.round(declaraties.totaal - totaalInkomsten).toLocaleString("nl-NL")} meer gedeclareerd dan ontvangen (achterstand)` : `€${Math.round(totaalInkomsten - declaraties.totaal).toLocaleString("nl-NL")} meer ontvangen dan gedeclareerd (andere inkomsten)`}`,
             ``,
-            `Declaraties per maand ${jaar} vs daadwerkelijk ontvangen:`,
-            ...cashflowData.map(m => {
-              const maandNum = String(MAANDEN.indexOf(m.maand) + 1).padStart(2, "0");
-              const declMaand = declaraties.perMaand.find(d => MAANDEN_NL[d.maand.slice(5, 7)] === m.maand || d.maand.slice(5, 7) === maandNum);
-              const declBedrag = declMaand?.bedrag ?? 0;
-              const verschil = m.inkomsten - declBedrag;
-              return `- ${m.maand}: gedeclareerd ${euro(declBedrag)}, ontvangen ${euro(m.inkomsten)}, verschil ${euro(verschil)}`;
-            }),
+            `Cashflow inkomsten per maand (wat binnenkwam op bankrekening):`,
+            ...cashflowData.map(m => `- ${m.maand}: ${euro(m.inkomsten)}`),
+            ``,
+            `Declaraties uitbetaald per maand (SVB/PGB, maand = periode uit database):`,
+            ...declaraties.perMaand.map(d => `- ${d.maand}: ${euro(d.bedrag)}`),
+            ``,
+            `NB: Koppel de maanden zelf: "Jan"="2025-01", "Feb"="2025-02" etc. Bereken per maand het verschil tussen ontvangen en gedeclareerd.`,
             ``,
             `Declaraties per soort:`,
             ...declaraties.perSoort.map(s => `- ${s.soort}: ${euro(s.bedrag)}`),
