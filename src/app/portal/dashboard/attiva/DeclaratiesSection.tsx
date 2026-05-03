@@ -16,8 +16,8 @@ interface DeclaratieData {
   perPersoon: { naam: string; bedrag: number }[];
 }
 
-function euro(v: number) {
-  return `€ ${Number(v).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
+function euro(v: number | string | undefined) {
+  return `€ ${Number(v ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
 }
 
 const MAANDEN_NL: Record<string, string> = {
@@ -48,6 +48,7 @@ export default function DeclaratiesSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
+  const [maand, setMaand] = useState<string | null>(null);
 
   async function load(j: number) {
     setLoading(true);
@@ -69,6 +70,7 @@ export default function DeclaratiesSection() {
   }
 
   useEffect(() => { load(jaar); }, [jaar]);
+  useEffect(() => { setMaand(null); }, [jaar]);
 
   const header = (
     <div className="flex items-center justify-between">
@@ -128,6 +130,16 @@ export default function DeclaratiesSection() {
     </div>
   );
 
+  // Build display names for months
+  const maandNamen = data.perMaand.map(r => MAANDEN_NL[r.maand.slice(5, 7)] ?? r.maand);
+
+  // Month filtering
+  const filteredMaandRow = maand
+    ? data.perMaand.find(r => (MAANDEN_NL[r.maand.slice(5, 7)] ?? r.maand) === maand)
+    : null;
+
+  const displayTotaal = filteredMaandRow ? filteredMaandRow.bedrag : data.totaal;
+
   const maandGrafiek = data.perMaand.map(r => ({
     maand: MAANDEN_NL[r.maand.slice(5, 7)] ?? r.maand,
     ...Object.fromEntries(
@@ -142,6 +154,32 @@ export default function DeclaratiesSection() {
 
   const vorigZorg = vorigData?.perSoort.find(s => s.soort === "Geleverde zorg");
   const vorigLoon = vorigData?.perSoort.find(s => s.soort === "Maandloon");
+
+  // Month selector UI
+  const maandSelector = maandNamen.length > 0 ? (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-sm text-gray-400">Maand:</span>
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
+        <button
+          onClick={() => setMaand(null)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+            maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+          }`}>
+          Heel jaar
+        </button>
+        {maandNamen.map((m) => (
+          <button
+            key={m}
+            onClick={() => setMaand(m)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              maand === m ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+            }`}>
+            {m}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
 
   const chatContext = [
     `Declaratieoverzicht Attiva Zorg — jaar ${jaar}:`,
@@ -167,7 +205,10 @@ export default function DeclaratiesSection() {
 
   return (
     <div className="space-y-6">
-      {header}
+      <div className="space-y-3">
+        {header}
+        {maandSelector}
+      </div>
 
       <div id="attiva-declaraties-export" className="space-y-6 bg-white">
       {/* KPI cards */}
@@ -177,11 +218,17 @@ export default function DeclaratiesSection() {
             <div className="w-9 h-9 bg-navy-700/10 rounded-xl flex items-center justify-center">
               <Wallet size={16} className="text-navy-700" />
             </div>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">{jaar}</span>
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+              {maand ? maand : jaar}
+            </span>
           </div>
-          <p className="text-sm text-gray-400 mb-1">Totaal uitbetaald</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(data.totaal)}</p>
-          <p className="text-xs text-gray-400 mt-1">{data.perPersoon.length} budgethouders</p>
+          <p className="text-sm text-gray-400 mb-1">
+            {maand ? `Uitbetaald ${maand}` : "Totaal uitbetaald"}
+          </p>
+          <p className="text-2xl font-bold text-navy-700">{euro(displayTotaal)}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {maand ? `${((displayTotaal / data.totaal) * 100).toFixed(1)}% van jaartotaal` : `${data.perPersoon.length} budgethouders`}
+          </p>
         </div>
 
         <div className="card border-t-4 border-t-[#1B3A5C]">
@@ -226,8 +273,12 @@ export default function DeclaratiesSection() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Bar dataKey="bedrag" name="Uitbetaald" fill="#1B3A5C" radius={[5,5,0,0]} />
+              <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+              <Bar dataKey="bedrag" name="Uitbetaald" radius={[5,5,0,0]}>
+                {maandGrafiek.map((entry, i) => (
+                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#1B3A5C" : "#cbd5e1"} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -241,7 +292,7 @@ export default function DeclaratiesSection() {
                   <Cell key={s.soort} fill={SOORT_COLORS[s.soort] ?? "#94a3b8"} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+              <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-2.5 mt-2">
@@ -317,10 +368,20 @@ export default function DeclaratiesSection() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
                 <XAxis dataKey="maand" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
                 <Legend iconType="circle" iconSize={8} />
-                <Bar dataKey={jaar - 1} name={`${jaar - 1}`} fill="#cbd5e1" radius={[4,4,0,0]} />
-                <Bar dataKey={jaar} name={`${jaar}`} fill="#1B3A5C" radius={[4,4,0,0]} />
+                <Bar dataKey={jaar - 1} name={`${jaar - 1}`} radius={[4,4,0,0]}>
+                  {data.perMaand.map((r, i) => {
+                    const m = MAANDEN_NL[r.maand.slice(5,7)] ?? r.maand;
+                    return <Cell key={i} fill={maand === null || maand === m ? "#cbd5e1" : "#e9ecef"} />;
+                  })}
+                </Bar>
+                <Bar dataKey={jaar} name={`${jaar}`} radius={[4,4,0,0]}>
+                  {data.perMaand.map((r, i) => {
+                    const m = MAANDEN_NL[r.maand.slice(5,7)] ?? r.maand;
+                    return <Cell key={i} fill={maand === null || maand === m ? "#1B3A5C" : "#d1d5db"} />;
+                  })}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -340,7 +401,7 @@ export default function DeclaratiesSection() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
                 <XAxis dataKey="soort" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
                 <Legend iconType="circle" iconSize={8} />
                 <Bar dataKey={jaar - 1} name={`${jaar - 1}`} fill="#cbd5e1" radius={[4,4,0,0]} />
                 <Bar dataKey={jaar} name={`${jaar}`} fill="#1B3A5C" radius={[4,4,0,0]} />

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, ReferenceLine, Legend,
+  ResponsiveContainer, LineChart, Line, ReferenceLine, Legend, Cell,
 } from "recharts";
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
@@ -30,8 +30,8 @@ const HUIDIG_JAAR = new Date().getFullYear();
 const JAREN = Array.from({ length: HUIDIG_JAAR - 2023 }, (_, i) => 2024 + i);
 const PIE_COLORS = ["#1B3A5C","#C9A84C","#3B6EA5","#E8B84B","#264D73","#D4A843","#4A7FB5","#F0C75A"];
 
-function euro(v: number) {
-  return `€ ${Number(v).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
+function euro(v: number | string | undefined) {
+  return `€ ${Number(v ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
 }
 function pct(v: number) {
   return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
@@ -83,9 +83,9 @@ function buildCashflowData(pl: PlRow[]) {
     });
 }
 
-function buildUitgavenCategorieen(pl: PlRow[]) {
+function buildUitgavenCategorieen(pl: PlRow[], period: number | null) {
   return Object.entries(
-    pl.filter(r => !r.IsRevenue)
+    pl.filter(r => !r.IsRevenue && (period === null || r.Period === period))
       .reduce((acc, r) => {
         acc[r.Description] = (acc[r.Description] ?? 0) + r.Amount;
         return acc;
@@ -105,6 +105,7 @@ export default function CashflowSection() {
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState(HUIDIG_JAAR);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [maand, setMaand] = useState<string | null>(null);
 
   async function load(j: number, forceRefresh = false) {
     setLoading(true);
@@ -128,6 +129,7 @@ export default function CashflowSection() {
   }
 
   useEffect(() => { load(jaar); }, [jaar]);
+  useEffect(() => { setMaand(null); }, [jaar]);
 
   const jaarSelector = (
     <div className="flex items-center justify-between">
@@ -198,7 +200,12 @@ export default function CashflowSection() {
 
   const cashflowData = buildCashflowData(data.pl ?? []);
   const vorigCashflowData = vorigData ? buildCashflowData(vorigData.pl ?? []) : [];
-  const uitgavenCategorieen = buildUitgavenCategorieen(data.pl ?? []);
+
+  // Month filtering
+  const selectedPeriod = maand ? MAANDEN.indexOf(maand) + 1 : null;
+  const filteredMaandRow = maand ? cashflowData.find(m => m.maand === maand) : null;
+
+  const uitgavenCategorieen = buildUitgavenCategorieen(data.pl ?? [], selectedPeriod);
 
   const totaalInkomsten = cashflowData.reduce((s, r) => s + r.inkomsten, 0);
   const totaalUitgaven = cashflowData.reduce((s, r) => s + r.uitgaven, 0);
@@ -209,13 +216,51 @@ export default function CashflowSection() {
   const vorigUitgaven = vorigCashflowData.reduce((s, r) => s + r.uitgaven, 0);
   const vorigNetto = vorigInkomsten - vorigUitgaven;
 
-  // Beste en slechtste maand
+  // Display values (filtered to month or full year)
+  const displayInkomsten = filteredMaandRow ? filteredMaandRow.inkomsten : totaalInkomsten;
+  const displayUitgaven = filteredMaandRow ? filteredMaandRow.uitgaven : totaalUitgaven;
+  const displayNetto = filteredMaandRow ? filteredMaandRow.netto : nettoCashflow;
+  const displayCumulatief = filteredMaandRow ? filteredMaandRow.cumulatief : eindSaldo;
+  const displayVorigInkomsten = maand ? (vorigCashflowData.find(m => m.maand === maand)?.inkomsten ?? 0) : vorigInkomsten;
+  const displayVorigUitgaven = maand ? (vorigCashflowData.find(m => m.maand === maand)?.uitgaven ?? 0) : vorigUitgaven;
+  const displayVorigNetto = maand ? (vorigCashflowData.find(m => m.maand === maand)?.netto ?? 0) : vorigNetto;
+
+  // Beste en slechtste maand (always based on full year)
   const besteMaand = [...cashflowData].sort((a, b) => b.netto - a.netto)[0];
   const slechteMaand = [...cashflowData].sort((a, b) => a.netto - b.netto)[0];
 
+  // Month selector UI
+  const maandSelector = cashflowData.length > 0 ? (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-sm text-gray-400">Maand:</span>
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
+        <button
+          onClick={() => setMaand(null)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+            maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+          }`}>
+          Heel jaar
+        </button>
+        {cashflowData.map((m) => (
+          <button
+            key={m.maand}
+            onClick={() => setMaand(m.maand)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              maand === m.maand ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+            }`}>
+            {m.maand}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6">
-      {jaarSelector}
+      <div className="space-y-3">
+        {jaarSelector}
+        {maandSelector}
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
@@ -224,11 +269,11 @@ export default function CashflowSection() {
             <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
               <ArrowUpRight size={16} className="text-emerald-600" />
             </div>
-            <Trend current={totaalInkomsten} previous={vorigInkomsten} />
+            <Trend current={displayInkomsten} previous={displayVorigInkomsten} />
           </div>
-          <p className="text-sm text-gray-400 mb-1">Totaal ontvangen</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(totaalInkomsten)}</p>
-          {vorigInkomsten > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(vorigInkomsten)}</p>}
+          <p className="text-sm text-gray-400 mb-1">{maand ? `Ontvangen ${maand}` : "Totaal ontvangen"}</p>
+          <p className="text-2xl font-bold text-navy-700">{euro(displayInkomsten)}</p>
+          {displayVorigInkomsten > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigInkomsten)}</p>}
         </div>
 
         <div className="card border-t-4 border-t-red-400">
@@ -236,28 +281,28 @@ export default function CashflowSection() {
             <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
               <ArrowDownRight size={16} className="text-red-500" />
             </div>
-            <Trend current={totaalUitgaven} previous={vorigUitgaven} inverse />
+            <Trend current={displayUitgaven} previous={displayVorigUitgaven} inverse />
           </div>
-          <p className="text-sm text-gray-400 mb-1">Totaal uitgegeven</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(totaalUitgaven)}</p>
-          {vorigUitgaven > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(vorigUitgaven)}</p>}
+          <p className="text-sm text-gray-400 mb-1">{maand ? `Uitgegeven ${maand}` : "Totaal uitgegeven"}</p>
+          <p className="text-2xl font-bold text-navy-700">{euro(displayUitgaven)}</p>
+          {displayVorigUitgaven > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigUitgaven)}</p>}
         </div>
 
-        <div className={`card border-t-4 ${nettoCashflow >= 0 ? "border-t-navy-700" : "border-t-orange-500"}`}>
+        <div className={`card border-t-4 ${displayNetto >= 0 ? "border-t-navy-700" : "border-t-orange-500"}`}>
           <div className="flex items-start justify-between mb-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${nettoCashflow >= 0 ? "bg-navy-700/10" : "bg-orange-50"}`}>
-              {nettoCashflow >= 0
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${displayNetto >= 0 ? "bg-navy-700/10" : "bg-orange-50"}`}>
+              {displayNetto >= 0
                 ? <TrendingUp size={16} className="text-navy-700" />
                 : <TrendingDown size={16} className="text-orange-500" />}
             </div>
-            <Trend current={nettoCashflow} previous={vorigNetto} />
+            <Trend current={displayNetto} previous={displayVorigNetto} />
           </div>
-          <p className="text-sm text-gray-400 mb-1">Netto cashflow</p>
-          <p className={`text-2xl font-bold ${nettoCashflow >= 0 ? "text-navy-700" : "text-orange-500"}`}>
-            {euro(nettoCashflow)}
+          <p className="text-sm text-gray-400 mb-1">{maand ? `Netto ${maand}` : "Netto cashflow"}</p>
+          <p className={`text-2xl font-bold ${displayNetto >= 0 ? "text-navy-700" : "text-orange-500"}`}>
+            {euro(displayNetto)}
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            {totaalInkomsten > 0 ? `${((nettoCashflow / totaalInkomsten) * 100).toFixed(1)}% van inkomsten` : ""}
+            {displayInkomsten > 0 ? `${((displayNetto / displayInkomsten) * 100).toFixed(1)}% van inkomsten` : ""}
           </p>
         </div>
 
@@ -267,11 +312,13 @@ export default function CashflowSection() {
               <Wallet size={16} className="text-gold-600" />
             </div>
           </div>
-          <p className="text-sm text-gray-400 mb-1">Cumulatief saldo</p>
-          <p className={`text-2xl font-bold ${eindSaldo >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {euro(eindSaldo)}
+          <p className="text-sm text-gray-400 mb-1">{maand ? `Cumulatief t/m ${maand}` : "Cumulatief saldo"}</p>
+          <p className={`text-2xl font-bold ${displayCumulatief >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            {euro(displayCumulatief)}
           </p>
-          <p className="text-xs text-gray-400 mt-1">Einde {MAANDEN[(cashflowData.length - 1)] ?? "periode"}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {maand ? `Einde ${maand}` : `Einde ${MAANDEN[(cashflowData.length - 1)] ?? "periode"}`}
+          </p>
         </div>
       </div>
 
@@ -285,11 +332,19 @@ export default function CashflowSection() {
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
                 tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: number) => euro(v)}
+              <Tooltip formatter={(v) => euro(v as number)}
                 contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               <Legend iconType="circle" iconSize={8} />
-              <Bar dataKey="inkomsten" name="Inkomsten" fill="#10b981" radius={[5,5,0,0]} />
-              <Bar dataKey="uitgaven" name="Uitgaven" fill="#ef4444" radius={[5,5,0,0]} opacity={0.8} />
+              <Bar dataKey="inkomsten" name="Inkomsten" radius={[5,5,0,0]}>
+                {cashflowData.map((entry, i) => (
+                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#10b981" : "#bbf7d0"} />
+                ))}
+              </Bar>
+              <Bar dataKey="uitgaven" name="Uitgaven" radius={[5,5,0,0]}>
+                {cashflowData.map((entry, i) => (
+                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#ef4444" : "#fecaca"} opacity={maand === null || maand === entry.maand ? 0.8 : 0.5} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -306,13 +361,16 @@ export default function CashflowSection() {
                 <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
                   tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: number) => euro(v)}
+                <Tooltip formatter={(v) => euro(v as number)}
                   contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
                 <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={1.5} />
                 <Bar dataKey="netto" name="Netto cashflow" radius={[4,4,0,0]}>
-                  {cashflowData.map((entry, i) => (
-                    <rect key={i} fill={entry.netto >= 0 ? "#1B3A5C" : "#ef4444"} />
-                  ))}
+                  {cashflowData.map((entry, i) => {
+                    const isSelected = maand === null || maand === entry.maand;
+                    const baseColor = entry.netto >= 0 ? "#1B3A5C" : "#ef4444";
+                    const dimColor = entry.netto >= 0 ? "#cbd5e1" : "#fecaca";
+                    return <Cell key={i} fill={isSelected ? baseColor : dimColor} />;
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -326,11 +384,21 @@ export default function CashflowSection() {
                 <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
                   tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: number) => euro(v)}
+                <Tooltip formatter={(v) => euro(v as number)}
                   contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
                 <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={1.5} strokeDasharray="4 4" />
                 <Line type="monotone" dataKey="cumulatief" name="Cumulatief saldo" stroke="#C9A84C"
-                  strokeWidth={2.5} dot={{ r: 4, fill: "#C9A84C", stroke: "white", strokeWidth: 2 }}
+                  strokeWidth={2.5}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props;
+                    const isSelected = maand === null || maand === payload.maand;
+                    return (
+                      <circle key={cx} cx={cx} cy={cy}
+                        r={maand === payload.maand ? 6 : 4}
+                        fill={isSelected ? "#C9A84C" : "#e9d8a6"}
+                        stroke="white" strokeWidth={2} />
+                    );
+                  }}
                   activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -341,7 +409,9 @@ export default function CashflowSection() {
       {/* Top uitgavenposten */}
       {uitgavenCategorieen.length > 0 && (
         <div className="card">
-          <h3 className="font-bold text-navy-700 mb-5">Top uitgavenposten — {jaar}</h3>
+          <h3 className="font-bold text-navy-700 mb-5">
+            Top uitgavenposten — {maand ? `${maand} ${jaar}` : jaar}
+          </h3>
           <div className="space-y-3">
             {uitgavenCategorieen.map((k, i) => (
               <div key={k.name}>
@@ -353,7 +423,7 @@ export default function CashflowSection() {
                   <span className="text-sm text-gray-600 flex-1 truncate">{k.name}</span>
                   <span className="text-sm font-bold text-navy-700 flex-shrink-0">{euro(k.value)}</span>
                   <span className="text-xs text-gray-400 flex-shrink-0 w-10 text-right">
-                    {totaalUitgaven > 0 ? `${((k.value / totaalUitgaven) * 100).toFixed(0)}%` : ""}
+                    {displayUitgaven > 0 ? `${((k.value / displayUitgaven) * 100).toFixed(0)}%` : ""}
                   </span>
                 </div>
                 <div className="ml-8 h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -368,7 +438,7 @@ export default function CashflowSection() {
           </div>
 
           {/* Beste / slechtste maand */}
-          {cashflowData.length > 1 && (
+          {cashflowData.length > 1 && !maand && (
             <div className="mt-6 grid grid-cols-2 gap-4 pt-5 border-t border-gray-100">
               <div className="bg-emerald-50 rounded-xl p-4">
                 <div className="text-xs text-emerald-600 font-semibold uppercase tracking-wider mb-1">Beste maand</div>
@@ -413,7 +483,7 @@ export default function CashflowSection() {
           ] : []),
           ``,
           `Top uitgavenposten ${jaar}:`,
-          ...uitgavenCategorieen.map(k =>
+          ...buildUitgavenCategorieen(data.pl ?? [], null).map(k =>
             `- ${k.name}: ${euro(k.value)} (${totaalUitgaven > 0 ? ((k.value / totaalUitgaven) * 100).toFixed(0) : 0}% van totale uitgaven)`
           ),
           ...(besteMaand ? [``, `Beste maand qua cashflow: ${besteMaand.maand} (${euro(besteMaand.netto)})`] : []),

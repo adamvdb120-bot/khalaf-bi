@@ -20,8 +20,8 @@ interface ExactData {
   omzetPerKlant: KlantOmzet[] | null;
 }
 
-function euro(v: number) {
-  return `€ ${Number(v).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
+function euro(v: number | string | undefined) {
+  return `€ ${Number(v ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
 }
 
 function pct(v: number) {
@@ -96,17 +96,15 @@ export default function AttivaCharts() {
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [maand, setMaand] = useState<string | null>(null);
 
   async function load(j: number, forceRefresh = false) {
     setLoading(true);
     setError(null);
     try {
-      // Één call met beide jaren — vermijdt race condition op token refresh
-      // forceRefresh=true bij handmatig vernieuwen, anders cache gebruiken
       const res = await fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`);
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
-      // Response is { huidig: ExactData, vorig: ExactData }
       setData(json.huidig ?? json);
       setVorigData(json.vorig ?? null);
       setLastUpdated(new Date());
@@ -118,6 +116,7 @@ export default function AttivaCharts() {
   }
 
   useEffect(() => { load(jaar); }, [jaar]);
+  useEffect(() => { setMaand(null); }, [jaar]);
 
   const jaarSelector = (
     <div className="flex items-center justify-between">
@@ -214,6 +213,10 @@ export default function AttivaCharts() {
   const maandData = buildMaandData(data.pl ?? []);
   const vorigMaandData = vorigData ? buildMaandData(vorigData.pl ?? []) : [];
 
+  // Month filtering
+  const selectedPeriod = maand ? MAANDEN.indexOf(maand) + 1 : null;
+  const filteredMaandRow = maand ? maandData.find(m => m.maand === maand) : null;
+
   const totaalOmzet = Math.max(0, maandData.reduce((s, r) => s + r.omzet, 0));
   const totaalKosten = Math.max(0, maandData.reduce((s, r) => s + r.kosten, 0));
   const totaalMarge = totaalOmzet - totaalKosten;
@@ -223,6 +226,15 @@ export default function AttivaCharts() {
   const vorigKosten = Math.max(0, vorigMaandData.reduce((s, r) => s + r.kosten, 0));
   const vorigMarge = vorigOmzet - vorigKosten;
 
+  // Display values (filtered to month or full year)
+  const displayOmzet = filteredMaandRow ? filteredMaandRow.omzet : totaalOmzet;
+  const displayKosten = filteredMaandRow ? filteredMaandRow.kosten : totaalKosten;
+  const displayMarge = filteredMaandRow ? filteredMaandRow.marge : totaalMarge;
+  const displayMargePercent = displayOmzet > 0 ? (displayMarge / displayOmzet) * 100 : 0;
+  const displayVorigOmzet = maand ? (vorigMaandData.find(m => m.maand === maand)?.omzet ?? 0) : vorigOmzet;
+  const displayVorigKosten = maand ? (vorigMaandData.find(m => m.maand === maand)?.kosten ?? 0) : vorigKosten;
+  const displayVorigMarge = maand ? (vorigMaandData.find(m => m.maand === maand)?.marge ?? 0) : vorigMarge;
+
   const vergelijkData = MAANDEN.map((m) => ({
     maand: m,
     [`omzet${jaar}`]: maandData.find(r => r.maand === m)?.omzet ?? 0,
@@ -230,7 +242,8 @@ export default function AttivaCharts() {
   })).filter(r => (r[`omzet${jaar}`] as number) > 0 || (r[`omzet${jaar - 1}`] as number) > 0);
 
   const kostenPerCategorie = Object.entries(
-    (data.pl ?? []).filter(r => !r.IsRevenue)
+    (data.pl ?? [])
+      .filter(r => !r.IsRevenue && (selectedPeriod === null || r.Period === selectedPeriod))
       .reduce((acc, r) => { acc[r.Description] = (acc[r.Description] ?? 0) + r.Amount; return acc; }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value: Math.round(value) }))
     .filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 10);
@@ -243,11 +256,9 @@ export default function AttivaCharts() {
     .map(d => ({ ...d, totaal: (d.Age0to30??0)+(d.Age31to60??0)+(d.Age61to90??0)+(d.Age90Plus??0) }))
     .filter(d => d.totaal > 0).sort((a, b) => b.totaal - a.totaal).slice(0, 5);
 
-  // Echte factuuromzet per klant (uit SalesInvoices) — huidig en vorig jaar
   const klantOmzetHuidig = data.omzetPerKlant ?? [];
   const klantOmzetVorig = vorigData?.omzetPerKlant ?? [];
 
-  // Vergelijk klanten tussen jaren
   const alleKlantNamen = Array.from(new Set([
     ...klantOmzetHuidig.map(k => k.naam),
     ...klantOmzetVorig.map(k => k.naam),
@@ -291,9 +302,38 @@ export default function AttivaCharts() {
     ] : []),
   ].join("\n");
 
+  // Month selector UI
+  const maandSelector = maandData.length > 0 ? (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-sm text-gray-400">Maand:</span>
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
+        <button
+          onClick={() => setMaand(null)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+            maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+          }`}>
+          Heel jaar
+        </button>
+        {maandData.map((m) => (
+          <button
+            key={m.maand}
+            onClick={() => setMaand(m.maand)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              maand === m.maand ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+            }`}>
+            {m.maand}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6">
-      {jaarSelector}
+      <div className="space-y-3">
+        {jaarSelector}
+        {maandSelector}
+      </div>
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
       {/* KPI Cards */}
@@ -304,11 +344,11 @@ export default function AttivaCharts() {
             <div className="w-9 h-9 bg-navy-700/10 rounded-xl flex items-center justify-center">
               <Euro size={16} className="text-navy-700" />
             </div>
-            <Trend current={totaalOmzet} previous={vorigOmzet} />
+            <Trend current={displayOmzet} previous={displayVorigOmzet} />
           </div>
-          <p className="text-sm text-gray-400 mb-1">Totale omzet</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(totaalOmzet)}</p>
-          {vorigOmzet > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(vorigOmzet)}</p>}
+          <p className="text-sm text-gray-400 mb-1">{maand ? `Omzet ${maand}` : "Totale omzet"}</p>
+          <p className="text-2xl font-bold text-navy-700">{euro(displayOmzet)}</p>
+          {displayVorigOmzet > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigOmzet)}</p>}
         </div>
 
         {/* Kosten */}
@@ -317,30 +357,30 @@ export default function AttivaCharts() {
             <div className="w-9 h-9 bg-gold-500/10 rounded-xl flex items-center justify-center">
               <Euro size={16} className="text-gold-500" />
             </div>
-            <Trend current={totaalKosten} previous={vorigKosten} inverse />
+            <Trend current={displayKosten} previous={displayVorigKosten} inverse />
           </div>
-          <p className="text-sm text-gray-400 mb-1">Totale kosten</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(totaalKosten)}</p>
-          {vorigKosten > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(vorigKosten)}</p>}
+          <p className="text-sm text-gray-400 mb-1">{maand ? `Kosten ${maand}` : "Totale kosten"}</p>
+          <p className="text-2xl font-bold text-navy-700">{euro(displayKosten)}</p>
+          {displayVorigKosten > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigKosten)}</p>}
         </div>
 
         {/* Resultaat */}
-        <div className={`card border-t-4 ${totaalMarge >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
+        <div className={`card border-t-4 ${displayMarge >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
           <div className="flex items-start justify-between mb-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${totaalMarge >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
-              {totaalMarge >= 0
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${displayMarge >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+              {displayMarge >= 0
                 ? <TrendingUp size={16} className="text-emerald-600" />
                 : <TrendingDown size={16} className="text-red-500" />}
             </div>
-            <Trend current={totaalMarge} previous={vorigMarge} />
+            <Trend current={displayMarge} previous={displayVorigMarge} />
           </div>
-          <p className="text-sm text-gray-400 mb-1">Nettoresultaat</p>
-          <p className={`text-2xl font-bold ${totaalMarge >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {euro(totaalMarge)}
+          <p className="text-sm text-gray-400 mb-1">{maand ? `Resultaat ${maand}` : "Nettoresultaat"}</p>
+          <p className={`text-2xl font-bold ${displayMarge >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            {euro(displayMarge)}
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            {margePercent.toFixed(1)}% marge
-            {vorigMarge !== 0 && ` · vorig jaar: ${euro(vorigMarge)}`}
+            {displayMargePercent.toFixed(1)}% marge
+            {displayVorigMarge !== 0 && ` · vorig jaar: ${euro(displayVorigMarge)}`}
           </p>
         </div>
       </div>
@@ -354,10 +394,18 @@ export default function AttivaCharts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+              <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               <Legend iconType="circle" iconSize={8} />
-              <Bar dataKey="omzet" name="Omzet" fill="#1B3A5C" radius={[5,5,0,0]} />
-              <Bar dataKey="kosten" name="Kosten" fill="#C9A84C" radius={[5,5,0,0]} />
+              <Bar dataKey="omzet" name="Omzet" radius={[5,5,0,0]}>
+                {maandData.map((entry, i) => (
+                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#1B3A5C" : "#cbd5e1"} />
+                ))}
+              </Bar>
+              <Bar dataKey="kosten" name="Kosten" radius={[5,5,0,0]}>
+                {maandData.map((entry, i) => (
+                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#C9A84C" : "#e9ecef"} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -372,12 +420,14 @@ export default function AttivaCharts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+              <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={1.5} />
               <Line type="monotone" dataKey="marge" name="Resultaat" stroke="#1B3A5C" strokeWidth={2.5}
                 dot={(props) => {
                   const { cx, cy, payload } = props;
-                  return <circle key={cx} cx={cx} cy={cy} r={4} fill={payload.marge >= 0 ? "#10b981" : "#ef4444"} stroke="white" strokeWidth={2} />;
+                  const isSelected = maand === null || maand === payload.maand;
+                  const fill = !isSelected ? "#cbd5e1" : payload.marge >= 0 ? "#10b981" : "#ef4444";
+                  return <circle key={cx} cx={cx} cy={cy} r={maand === payload.maand ? 6 : 4} fill={fill} stroke="white" strokeWidth={2} />;
                 }}
               />
             </LineChart>
@@ -402,10 +452,18 @@ export default function AttivaCharts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+              <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               <Legend iconType="circle" iconSize={8} />
-              <Bar dataKey={`omzet${jaar - 1}`} name={`${jaar - 1}`} fill="#cbd5e1" radius={[5,5,0,0]} />
-              <Bar dataKey={`omzet${jaar}`} name={`${jaar}`} fill="#1B3A5C" radius={[5,5,0,0]} />
+              <Bar dataKey={`omzet${jaar - 1}`} name={`${jaar - 1}`} radius={[5,5,0,0]}>
+                {vergelijkData.map((entry, i) => (
+                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#cbd5e1" : "#e9ecef"} />
+                ))}
+              </Bar>
+              <Bar dataKey={`omzet${jaar}`} name={`${jaar}`} radius={[5,5,0,0]}>
+                {vergelijkData.map((entry, i) => (
+                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#1B3A5C" : "#d1d5db"} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -415,13 +473,15 @@ export default function AttivaCharts() {
       {kostenPerCategorie.length > 0 && (
         <div className="grid grid-cols-2 gap-5">
           <div className="card">
-            <h3 className="font-bold text-navy-700 mb-4">Kostenuitsplitsing {data.jaar}</h3>
+            <h3 className="font-bold text-navy-700 mb-4">
+              Kostenuitsplitsing {maand ? `${maand} ${data.jaar}` : data.jaar}
+            </h3>
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie data={kostenPerCategorie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={65} outerRadius={105} paddingAngle={3}>
                   {kostenPerCategorie.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(v: number) => euro(v)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
