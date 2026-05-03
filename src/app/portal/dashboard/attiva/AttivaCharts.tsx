@@ -235,6 +235,29 @@ export default function AttivaCharts() {
   const displayVorigKosten = maand ? (vorigMaandData.find(m => m.maand === maand)?.kosten ?? 0) : vorigKosten;
   const displayVorigMarge = maand ? (vorigMaandData.find(m => m.maand === maand)?.marge ?? 0) : vorigMarge;
 
+  // Prognose berekening (alleen bij heel jaar + onvolledig jaar)
+  const aantalMaandenMetData = maandData.length;
+  const restMaanden = 12 - aantalMaandenMetData;
+  const toonPrognose = !maand && aantalMaandenMetData > 0 && aantalMaandenMetData < 12;
+
+  const gemOmzetPerMaand = aantalMaandenMetData > 0 ? totaalOmzet / aantalMaandenMetData : 0;
+  const gemKostenPerMaand = aantalMaandenMetData > 0 ? totaalKosten / aantalMaandenMetData : 0;
+  const gemMargePerMaand = gemOmzetPerMaand - gemKostenPerMaand;
+
+  const verwachteJaarOmzet = Math.round(gemOmzetPerMaand * 12);
+  const verwachteJaarKosten = Math.round(gemKostenPerMaand * 12);
+  const verwachteJaarResultaat = verwachteJaarOmzet - verwachteJaarKosten;
+
+  // Gecombineerde data voor lijndiagram: actief + prognose (stippellijn)
+  const prognoseLijnData = [
+    ...maandData.map(m => ({ maand: m.maand, marge: m.marge, prognose: undefined as number | undefined })),
+    // Overlap op laatste actuele maand voor continuïteit
+    ...(toonPrognose && maandData.length > 0 ? [
+      { maand: maandData[maandData.length - 1].maand, marge: undefined as number | undefined, prognose: maandData[maandData.length - 1].marge },
+      ...MAANDEN.slice(aantalMaandenMetData).map(m => ({ maand: m, marge: undefined as number | undefined, prognose: Math.round(gemMargePerMaand) })),
+    ] : []),
+  ];
+
   const vergelijkData = MAANDEN.map((m) => ({
     maand: m,
     [`omzet${jaar}`]: maandData.find(r => r.maand === m)?.omzet ?? 0,
@@ -299,6 +322,14 @@ export default function AttivaCharts() {
     ] : []),
     ...(nieuweClienten.length > 0 ? [
       `Nieuwe klanten in ${jaar} (kwamen niet voor in ${jaar-1}): ${nieuweClienten.join(", ")}`,
+    ] : []),
+    ...(toonPrognose ? [
+      ``,
+      `Prognose ${jaar} (op basis van ${aantalMaandenMetData} maanden, gemiddelde doorgetrokken):`,
+      `- Verwachte jaaromzet: ${euro(verwachteJaarOmzet)} (nu ${euro(totaalOmzet)}, ${Math.round((totaalOmzet/verwachteJaarOmzet)*100)}% van prognose)`,
+      `- Verwachte jaarkosten: ${euro(verwachteJaarKosten)} (nu ${euro(totaalKosten)})`,
+      `- Verwacht jaarresultaat: ${euro(verwachteJaarResultaat)} (nu ${euro(totaalMarge)})`,
+      `- Nog ${restMaanden} maanden te gaan`,
     ] : []),
   ].join("\n");
 
@@ -412,6 +443,82 @@ export default function AttivaCharts() {
         </div>
       </div>
 
+      {/* Prognose kaart */}
+      {toonPrognose && (
+        <div className="card border border-dashed border-navy-700/25 bg-navy-700/[0.02]">
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-bold text-navy-700">Prognose {jaar}</h3>
+                <span className="text-[10px] bg-navy-700/10 text-navy-700 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide">
+                  Schatting
+                </span>
+              </div>
+              <p className="text-xs text-gray-400">
+                Op basis van {aantalMaandenMetData} maanden · gemiddelde doorgetrokken naar jaareinde
+              </p>
+            </div>
+            <span className="text-sm font-semibold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl">
+              {restMaanden} maanden te gaan
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-5">
+            <div className="bg-white rounded-xl p-4 border border-gray-100">
+              <p className="text-xs text-gray-400 mb-1">Verwachte jaaromzet</p>
+              <p className="text-xl font-bold text-navy-700">{euro(verwachteJaarOmzet)}</p>
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+                  <span>Nu: {euro(totaalOmzet)}</span>
+                  <span>{Math.round((totaalOmzet / verwachteJaarOmzet) * 100)}%</span>
+                </div>
+                <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-navy-700 rounded-full" style={{ width: `${Math.min((totaalOmzet / verwachteJaarOmzet) * 100, 100)}%` }} />
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-gray-100">
+              <p className="text-xs text-gray-400 mb-1">Verwachte jaarkosten</p>
+              <p className="text-xl font-bold text-navy-700">{euro(verwachteJaarKosten)}</p>
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+                  <span>Nu: {euro(totaalKosten)}</span>
+                  <span>{Math.round((totaalKosten / verwachteJaarKosten) * 100)}%</span>
+                </div>
+                <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gold-500 rounded-full" style={{ width: `${Math.min((totaalKosten / verwachteJaarKosten) * 100, 100)}%` }} />
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 border ${verwachteJaarResultaat >= 0 ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"}`}>
+              <p className="text-xs text-gray-400 mb-1">Verwacht jaarresultaat</p>
+              <p className={`text-xl font-bold ${verwachteJaarResultaat >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                {euro(verwachteJaarResultaat)}
+              </p>
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+                  <span>Nu: {euro(totaalMarge)}</span>
+                  <span>{verwachteJaarResultaat !== 0 ? `${Math.round((totaalMarge / verwachteJaarResultaat) * 100)}%` : "—"}</span>
+                </div>
+                <div className="h-1 bg-white/60 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${verwachteJaarResultaat >= 0 ? "bg-emerald-500" : "bg-red-400"}`}
+                    style={{ width: `${verwachteJaarResultaat !== 0 ? Math.min(Math.abs((totaalMarge / verwachteJaarResultaat) * 100), 100) : 0}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Jaarvoortgang */}
+          <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+            <span>Jaarvoortgang</span>
+            <span>{aantalMaandenMetData} van 12 maanden ({Math.round((aantalMaandenMetData / 12) * 100)}%)</span>
+          </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-navy-700 rounded-full transition-all" style={{ width: `${(aantalMaandenMetData / 12) * 100}%` }} />
+          </div>
+        </div>
+      )}
+
       {/* Omzet vs Kosten */}
       {maandData.length > 0 && (
         <div className="card">
@@ -441,22 +548,42 @@ export default function AttivaCharts() {
       {/* Nettoresultaat trend */}
       {maandData.length > 0 && (
         <div className="card">
-          <h3 className="font-bold text-navy-700 mb-5">Nettoresultaat per maand — {data.jaar}</h3>
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-bold text-navy-700">Nettoresultaat per maand — {data.jaar}</h3>
+            {toonPrognose && !maand && (
+              <div className="flex items-center gap-3 text-xs text-gray-400">
+                <span className="flex items-center gap-1.5"><span className="inline-block w-6 border-t-2 border-navy-700 align-middle" />Werkelijk</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block w-6 border-t-2 border-dashed border-gray-400 align-middle" />Prognose</span>
+              </div>
+            )}
+          </div>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={maandData}>
+            <LineChart data={toonPrognose && !maand ? prognoseLijnData : maandData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
               <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={1.5} />
               <Line type="monotone" dataKey="marge" name="Resultaat" stroke="#1B3A5C" strokeWidth={2.5}
+                connectNulls={false}
                 dot={(props) => {
                   const { cx, cy, payload } = props;
+                  if (payload.marge === undefined || payload.marge === null) return <g key={cx} />;
                   const isSelected = maand === null || maand === payload.maand;
                   const fill = !isSelected ? "#cbd5e1" : payload.marge >= 0 ? "#10b981" : "#ef4444";
                   return <circle key={cx} cx={cx} cy={cy} r={maand === payload.maand ? 6 : 4} fill={fill} stroke="white" strokeWidth={2} />;
                 }}
               />
+              {toonPrognose && !maand && (
+                <Line type="monotone" dataKey="prognose" name="Prognose" stroke="#94a3b8"
+                  strokeWidth={2} strokeDasharray="6 4" connectNulls={false}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props;
+                    if (payload.prognose === undefined || payload.prognose === null) return <g key={cx} />;
+                    return <circle key={cx} cx={cx} cy={cy} r={3} fill="#94a3b8" stroke="white" strokeWidth={2} />;
+                  }}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
