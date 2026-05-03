@@ -229,37 +229,52 @@ export default function CashflowSection() {
   const besteMaand = [...cashflowData].sort((a, b) => b.netto - a.netto)[0];
   const slechteMaand = [...cashflowData].sort((a, b) => a.netto - b.netto)[0];
 
-  // Month selector UI
-  const maandSelector = cashflowData.length > 0 ? (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-sm text-gray-400">Maand:</span>
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
-        <button
-          onClick={() => setMaand(null)}
-          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-            maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-          }`}>
-          Heel jaar
-        </button>
-        {cashflowData.map((m) => (
-          <button
-            key={m.maand}
-            onClick={() => setMaand(m.maand)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-              maand === m.maand ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-            }`}>
-            {m.maand}
-          </button>
-        ))}
-      </div>
-    </div>
-  ) : null;
-
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        {jaarSelector}
-        {maandSelector}
+      {/* Gecombineerde filterbalk */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+            {JAREN.map((j) => (
+              <button key={j} onClick={() => setJaar(j)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+                }`}>
+                {j}
+              </button>
+            ))}
+          </div>
+          {cashflowData.length > 0 && <div className="h-5 w-px bg-gray-200" />}
+          {cashflowData.length > 0 && (
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
+              <button onClick={() => setMaand(null)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+                }`}>
+                Heel jaar
+              </button>
+              {cashflowData.map((m) => (
+                <button key={m.maand} onClick={() => setMaand(m.maand)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    maand === m.maand ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+                  }`}>
+                  {m.maand}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-xs text-gray-400">
+              Bijgewerkt om {lastUpdated.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+          <button onClick={() => load(jaar, true)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+            <RefreshCw size={12} /> Vernieuwen
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}

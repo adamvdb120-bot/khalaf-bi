@@ -73,18 +73,16 @@ export default function DeclaratiesSection() {
   useEffect(() => { setMaand(null); }, [jaar]);
 
   const header = (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-          {JAREN.map((j) => (
-            <button key={j} onClick={() => setJaar(j)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-              }`}>
-              {j}
-            </button>
-          ))}
-        </div>
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        {JAREN.map((j) => (
+          <button key={j} onClick={() => setJaar(j)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+            }`}>
+            {j}
+          </button>
+        ))}
       </div>
       <div className="flex items-center gap-2">
         <button onClick={() => load(jaar)}
@@ -155,31 +153,6 @@ export default function DeclaratiesSection() {
   const vorigZorg = vorigData?.perSoort.find(s => s.soort === "Geleverde zorg");
   const vorigLoon = vorigData?.perSoort.find(s => s.soort === "Maandloon");
 
-  // Month selector UI
-  const maandSelector = maandNamen.length > 0 ? (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-sm text-gray-400">Maand:</span>
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
-        <button
-          onClick={() => setMaand(null)}
-          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-            maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-          }`}>
-          Heel jaar
-        </button>
-        {maandNamen.map((m) => (
-          <button
-            key={m}
-            onClick={() => setMaand(m)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-              maand === m ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-            }`}>
-            {m}
-          </button>
-        ))}
-      </div>
-    </div>
-  ) : null;
 
   const chatContext = [
     `Declaratieoverzicht Attiva Zorg — jaar ${jaar}:`,
@@ -205,9 +178,53 @@ export default function DeclaratiesSection() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        {header}
-        {maandSelector}
+      {/* Gecombineerde filterbalk */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+            {JAREN.map((j) => (
+              <button key={j} onClick={() => setJaar(j)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+                }`}>
+                {j}
+              </button>
+            ))}
+          </div>
+          {maandNamen.length > 0 && <div className="h-5 w-px bg-gray-200" />}
+          {maandNamen.length > 0 && (
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
+              <button onClick={() => setMaand(null)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+                }`}>
+                Heel jaar
+              </button>
+              {maandNamen.map((m) => (
+                <button key={m} onClick={() => setMaand(m)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    maand === m ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
+                  }`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => load(jaar)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+            <RefreshCw size={12} /> Vernieuwen
+          </button>
+          <DownloadPDFButton
+            targetId="attiva-declaraties-export"
+            filename={`Attiva-Zorg-Declaraties-${jaar}`}
+            clientName="Attiva Zorg"
+            reportType="Declaratieoverzicht"
+            jaar={jaar}
+            label="PDF"
+          />
+        </div>
       </div>
 
       <div id="attiva-declaraties-export" className="space-y-6 bg-white">
