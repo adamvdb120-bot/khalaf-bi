@@ -9,6 +9,7 @@ import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Minus, RefreshCw, AlertCircle, Wallet,
 } from "lucide-react";
+import DashboardChat from "@/components/portal/DashboardChat";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface ExactData { pl: PlRow[] | null; jaar: number }
@@ -372,6 +373,36 @@ export default function CashflowSection() {
         <div className="card text-center py-16 text-gray-400">
           <p>Geen cashflow data gevonden voor {jaar} in Exact Online.</p>
         </div>
+      )}
+
+      {/* AI Chatbot */}
+      {cashflowData.length > 0 && (
+        <DashboardChat context={[
+          `Cashflow data Attiva Zorg — jaar ${jaar} (bron: Exact Online, real-time):`,
+          `- Totaal ontvangen: ${euro(totaalInkomsten)}`,
+          `- Totaal uitgegeven: ${euro(totaalUitgaven)}`,
+          `- Netto cashflow: ${euro(nettoCashflow)} (${totaalInkomsten > 0 ? ((nettoCashflow / totaalInkomsten) * 100).toFixed(1) : 0}% van inkomsten)`,
+          `- Cumulatief eindsaldo: ${euro(eindSaldo)}`,
+          ``,
+          `Cashflow per maand:`,
+          ...cashflowData.map(m =>
+            `- ${m.maand}: ontvangen ${euro(m.inkomsten)}, uitgegeven ${euro(m.uitgaven)}, netto ${euro(m.netto)}, cumulatief ${euro(m.cumulatief)}`
+          ),
+          ...(vorigCashflowData.length > 0 ? [
+            ``,
+            `Vorig jaar (${jaar - 1}) per maand:`,
+            ...vorigCashflowData.map(m =>
+              `- ${m.maand}: ontvangen ${euro(m.inkomsten)}, uitgegeven ${euro(m.uitgaven)}, netto ${euro(m.netto)}`
+            ),
+          ] : []),
+          ``,
+          `Top uitgavenposten ${jaar}:`,
+          ...uitgavenCategorieen.map(k =>
+            `- ${k.name}: ${euro(k.value)} (${totaalUitgaven > 0 ? ((k.value / totaalUitgaven) * 100).toFixed(0) : 0}% van totale uitgaven)`
+          ),
+          ...(besteMaand ? [``, `Beste maand qua cashflow: ${besteMaand.maand} (${euro(besteMaand.netto)})`] : []),
+          ...(slechteMaand ? [`Zwaarste maand qua cashflow: ${slechteMaand.maand} (${euro(slechteMaand.netto)})`] : []),
+        ].join("\n")} />
       )}
     </div>
   );
