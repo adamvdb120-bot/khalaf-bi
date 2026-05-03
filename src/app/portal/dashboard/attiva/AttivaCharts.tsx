@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Euro, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
+import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
@@ -97,6 +98,7 @@ export default function AttivaCharts() {
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [maand, setMaand] = useState<string | null>(null);
+  const [pinnedRefresh, setPinnedRefresh] = useState(0);
 
   async function load(j: number, forceRefresh = false) {
     setLoading(true);
@@ -725,7 +727,16 @@ export default function AttivaCharts() {
 
       </div>
 
-      {maandData.length > 0 && <DashboardChat context={chatContext} />}
+      {maandData.length > 0 && (
+        <>
+          <PinnedChartsSection tab="financieel" refresh={pinnedRefresh} />
+          <DashboardChat
+            context={chatContext}
+            tab="financieel"
+            onChartPinned={() => setPinnedRefresh(r => r + 1)}
+          />
+        </>
+      )}
     </div>
   );
 }

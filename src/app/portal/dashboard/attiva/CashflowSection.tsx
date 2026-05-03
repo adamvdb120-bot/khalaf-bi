@@ -10,6 +10,7 @@ import {
   Minus, RefreshCw, AlertCircle, Wallet,
 } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
+import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface ExactData { pl: PlRow[] | null; jaar: number }
@@ -106,6 +107,7 @@ export default function CashflowSection() {
   const [jaar, setJaar] = useState(HUIDIG_JAAR);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [maand, setMaand] = useState<string | null>(null);
+  const [pinnedRefresh, setPinnedRefresh] = useState(0);
 
   async function load(j: number, forceRefresh = false) {
     setLoading(true);
@@ -478,7 +480,12 @@ export default function CashflowSection() {
 
       {/* AI Chatbot */}
       {cashflowData.length > 0 && (
-        <DashboardChat context={[
+        <>
+          <PinnedChartsSection tab="cashflow" refresh={pinnedRefresh} />
+          <DashboardChat
+            tab="cashflow"
+            onChartPinned={() => setPinnedRefresh(r => r + 1)}
+            context={[
           `Cashflow data Attiva Zorg — jaar ${jaar} (bron: Exact Online, real-time):`,
           `- Totaal ontvangen: ${euro(totaalInkomsten)}`,
           `- Totaal uitgegeven: ${euro(totaalUitgaven)}`,
@@ -531,6 +538,7 @@ export default function CashflowSection() {
             ...declaraties.perPersoon.map(p => `- ${p.naam}: ${euro(p.bedrag)}`),
           ] : []),
         ].join("\n")} />
+        </>
       )}
     </div>
   );

@@ -5,8 +5,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { RefreshCw, AlertCircle, Users, Wallet, Heart } from "lucide-react";
+import { RefreshCw, AlertCircle, Users, Wallet, Heart, Pencil, ShieldCheck, AlertTriangle, X, Check } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
+import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 
 interface DeclaratieData {
@@ -49,6 +50,7 @@ export default function DeclaratiesSection() {
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
   const [maand, setMaand] = useState<string | null>(null);
+  const [pinnedRefresh, setPinnedRefresh] = useState(0);
 
   async function load(j: number) {
     setLoading(true);
@@ -430,7 +432,12 @@ export default function DeclaratiesSection() {
 
       </div>
 
-      <DashboardChat context={chatContext} />
+      <PinnedChartsSection tab="declaraties" refresh={pinnedRefresh} />
+      <DashboardChat
+        context={chatContext}
+        tab="declaraties"
+        onChartPinned={() => setPinnedRefresh(r => r + 1)}
+      />
     </div>
   );
 }
