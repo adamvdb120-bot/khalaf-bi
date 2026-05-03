@@ -13,6 +13,17 @@ import DashboardChat from "@/components/portal/DashboardChat";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface ExactData { pl: PlRow[] | null; jaar: number }
+interface DeclaratieData {
+  totaal: number;
+  perMaand: { maand: string; bedrag: number }[];
+  perSoort: { soort: string; bedrag: number }[];
+  perPersoon: { naam: string; bedrag: number }[];
+}
+
+const MAANDEN_NL: Record<string, string> = {
+  "01":"Jan","02":"Feb","03":"Mrt","04":"Apr","05":"Mei","06":"Jun",
+  "07":"Jul","08":"Aug","09":"Sep","10":"Okt","11":"Nov","12":"Dec",
+};
 
 const MAANDEN = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
 const HUIDIG_JAAR = new Date().getFullYear();
@@ -89,6 +100,7 @@ function buildUitgavenCategorieen(pl: PlRow[]) {
 export default function CashflowSection() {
   const [data, setData] = useState<ExactData | null>(null);
   const [vorigData, setVorigData] = useState<ExactData | null>(null);
+  const [declaraties, setDeclaraties] = useState<DeclaratieData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState(HUIDIG_JAAR);
@@ -98,11 +110,15 @@ export default function CashflowSection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`);
-      if (!res.ok) throw new Error(await res.text());
-      const json = await res.json();
+      const [exactRes, declRes] = await Promise.all([
+        fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`),
+        fetch(`/api/attiva/declaraties?jaar=${j}`),
+      ]);
+      if (!exactRes.ok) throw new Error(await exactRes.text());
+      const json = await exactRes.json();
       setData(json.huidig ?? json);
       setVorigData(json.vorig ?? null);
+      if (declRes.ok) setDeclaraties(await declRes.json());
       setLastUpdated(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Onbekende fout");
@@ -384,7 +400,7 @@ export default function CashflowSection() {
           `- Netto cashflow: ${euro(nettoCashflow)} (${totaalInkomsten > 0 ? ((nettoCashflow / totaalInkomsten) * 100).toFixed(1) : 0}% van inkomsten)`,
           `- Cumulatief eindsaldo: ${euro(eindSaldo)}`,
           ``,
-          `Cashflow per maand:`,
+          `Cashflow per maand (wat daadwerkelijk binnenkwam en uitging):`,
           ...cashflowData.map(m =>
             `- ${m.maand}: ontvangen ${euro(m.inkomsten)}, uitgegeven ${euro(m.uitgaven)}, netto ${euro(m.netto)}, cumulatief ${euro(m.cumulatief)}`
           ),
@@ -402,6 +418,30 @@ export default function CashflowSection() {
           ),
           ...(besteMaand ? [``, `Beste maand qua cashflow: ${besteMaand.maand} (${euro(besteMaand.netto)})`] : []),
           ...(slechteMaand ? [`Zwaarste maand qua cashflow: ${slechteMaand.maand} (${euro(slechteMaand.netto)})`] : []),
+          ...(declaraties ? [
+            ``,
+            `--- DECLARATIEOVERZICHT (wat gedeclareerd/uitbetaald is via SVB/PGB) ---`,
+            `BELANGRIJK: "Declaraties" = wat uitbetaald is via SVB/PGB budgetten. "Cashflow inkomsten" = wat daadwerkelijk op de bankrekening binnenkwam. Als declaraties hoger zijn dan cashflow inkomsten, zijn er nog openstaande betalingen.`,
+            ``,
+            `Totaal gedeclareerd/uitbetaald ${jaar}: ${euro(declaraties.totaal)}`,
+            `Totaal daadwerkelijk ontvangen (cashflow) ${jaar}: ${euro(totaalInkomsten)}`,
+            `Verschil (openstaand/timing): ${euro(declaraties.totaal - totaalInkomsten)}`,
+            ``,
+            `Declaraties per maand ${jaar} vs daadwerkelijk ontvangen:`,
+            ...cashflowData.map(m => {
+              const maandNum = String(MAANDEN.indexOf(m.maand) + 1).padStart(2, "0");
+              const declMaand = declaraties.perMaand.find(d => MAANDEN_NL[d.maand.slice(5, 7)] === m.maand || d.maand.slice(5, 7) === maandNum);
+              const declBedrag = declMaand?.bedrag ?? 0;
+              const verschil = m.inkomsten - declBedrag;
+              return `- ${m.maand}: gedeclareerd ${euro(declBedrag)}, ontvangen ${euro(m.inkomsten)}, verschil ${euro(verschil)}`;
+            }),
+            ``,
+            `Declaraties per soort:`,
+            ...declaraties.perSoort.map(s => `- ${s.soort}: ${euro(s.bedrag)}`),
+            ``,
+            `Declaraties per cliënt:`,
+            ...declaraties.perPersoon.map(p => `- ${p.naam}: ${euro(p.bedrag)}`),
+          ] : []),
         ].join("\n")} />
       )}
     </div>
