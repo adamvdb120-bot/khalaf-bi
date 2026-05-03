@@ -6,7 +6,7 @@ import { CheckCircle, Clock, Mail, Phone, Send, Star } from "lucide-react";
 const voordelen = [
   { icon: Clock, tekst: "Reactie binnen 48 uur, vaak al eerder" },
   { icon: Star, tekst: "Gratis en vrijblijvend kennismakingsgesprek" },
-  { icon: CheckCircle, tekst: "Maatwerk advies voor uw specifieke branche" },
+  { icon: CheckCircle, tekst: "Maatwerk advies voor jouw specifieke branche" },
 ];
 
 export default function ContactPage() {
@@ -35,7 +35,7 @@ export default function ContactPage() {
             Vraag een <span className="text-gold-400">gratis demo</span> aan
           </h1>
           <p className="text-navy-200 text-xl max-w-xl mx-auto">
-            Binnen 48 uur nemen wij contact met u op voor een kennismakingsgesprek op maat.
+            Binnen 48 uur nemen wij contact met je op voor een kennismakingsgesprek op maat.
           </p>
         </div>
       </section>
@@ -47,8 +47,8 @@ export default function ContactPage() {
             <div>
               <h2 className="text-2xl font-bold text-navy-700 mb-3">Neem contact op</h2>
               <p className="text-gray-500 leading-relaxed text-sm">
-                Heeft u vragen over onze diensten of wilt u direct een demo plannen?
-                Wij helpen u graag verder.
+                Heb je vragen over onze diensten of wil je direct een demo plannen?
+                Wij helpen je graag verder.
               </p>
             </div>
 
@@ -86,7 +86,7 @@ export default function ContactPage() {
 
             {/* Klanten */}
             <div className="border border-gray-100 rounded-2xl p-5">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Zij gingen u voor</div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Zij gingen je voor</div>
               <div className="space-y-3">
                 {[
                   { naam: "Areys Restaurant", sector: "Horeca" },
@@ -110,7 +110,7 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-2xl font-bold text-navy-700 mb-3">Bericht ontvangen!</h3>
                 <p className="text-gray-500 max-w-sm">
-                  Bedankt voor uw bericht. Wij nemen binnen 48 uur contact met u op.
+                  Bedankt voor je bericht. Wij nemen binnen 48 uur contact met je op.
                 </p>
               </div>
             ) : (
@@ -123,7 +123,7 @@ export default function ContactPage() {
                       <input
                         required type="text"
                         className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700/20 focus:border-navy-700 transition"
-                        placeholder="Uw naam"
+                        placeholder="Je naam"
                       />
                     </div>
                     <div>
@@ -141,7 +141,7 @@ export default function ContactPage() {
                     <input
                       required type="email"
                       className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700/20 focus:border-navy-700 transition"
-                      placeholder="u@bedrijf.nl"
+                      placeholder="jij@bedrijf.nl"
                     />
                   </div>
 
@@ -155,11 +155,11 @@ export default function ContactPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Uw bericht *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Je bericht *</label>
                     <textarea
                       required rows={5}
                       className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700/20 focus:border-navy-700 transition resize-none"
-                      placeholder="Vertel ons over uw bedrijf en wat u zoekt..."
+                      placeholder="Vertel ons over je bedrijf en wat je zoekt..."
                     />
                   </div>
 

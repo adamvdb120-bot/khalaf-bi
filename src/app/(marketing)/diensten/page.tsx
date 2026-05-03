@@ -6,35 +6,35 @@ const steps = [
     num: "01",
     icon: MessageSquare,
     title: "Intake & KPI-sessie",
-    desc: "We starten met een diepgaand gesprek over uw bedrijf, processen en doelen. Samen definiëren we welke KPI's voor u echt van belang zijn. Dit is de basis van alles.",
+    desc: "We starten met een diepgaand gesprek over je bedrijf, processen en doelen. Samen bepalen we welke KPI's voor jou écht van belang zijn. Dit is de basis van alles.",
     accent: "bg-blue-50 text-blue-600 border-blue-100",
   },
   {
     num: "02",
     icon: Database,
     title: "Data-integratie",
-    desc: "Wij koppelen uw bronsystemen (boekhouding, kassa, CRM, Excel) via API's of connectoren aan een centraal datamodel. Datakwaliteit wordt gecontroleerd en gevalideerd.",
+    desc: "Wij koppelen je bronsystemen (boekhouding, kassa, CRM, Excel) via API's aan een centraal datamodel. Datakwaliteit wordt gecontroleerd en gevalideerd.",
     accent: "bg-violet-50 text-violet-600 border-violet-100",
   },
   {
     num: "03",
     icon: BarChart2,
     title: "Dashboard bouwen",
-    desc: "Op basis van het datamodel bouwen wij uw maatwerk dashboard. Interactief, overzichtelijk en afgestemd op uw branche. U valideert elke stap.",
+    desc: "Op basis van het datamodel bouwen wij je maatwerk dashboard. Interactief, overzichtelijk en afgestemd op jouw branche. Je valideert elke stap.",
     accent: "bg-gold-500/10 text-gold-600 border-gold-200",
   },
   {
     num: "04",
     icon: Rocket,
     title: "Livegang & training",
-    desc: "Na akkoord gaat het dashboard live in uw persoonlijk portaal. Wij trainen u en uw team zodat iedereen de cijfers begrijpt en vertrouwt.",
+    desc: "Na akkoord gaat het dashboard live in je persoonlijk portaal. Wij trainen je en je team zodat iedereen de cijfers begrijpt en vertrouwt.",
     accent: "bg-emerald-50 text-emerald-600 border-emerald-100",
   },
   {
     num: "05",
     icon: Settings,
     title: "Doorlopende optimalisatie",
-    desc: "Maandelijkse check-ins om KPI's te evalueren, dashboards bij te werken en nieuwe inzichten toe te voegen naarmate uw bedrijf groeit.",
+    desc: "Maandelijkse check-ins om KPI's te evalueren, dashboards bij te werken en nieuwe inzichten toe te voegen naarmate je bedrijf groeit.",
     accent: "bg-teal-50 text-teal-600 border-teal-100",
   },
 ];
@@ -61,7 +61,7 @@ export default function DienstenPage() {
           </h1>
           <p className="text-navy-200 text-xl max-w-2xl mx-auto leading-relaxed">
             Wij leveren een complete BI-oplossing: van data-integratie en KPI-structuur
-            tot een live maatwerk dashboard dat uw besluitvorming vereenvoudigt.
+            tot een live maatwerk dashboard dat jouw besluitvorming vereenvoudigt.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <Link href="/contact" className="inline-flex items-center gap-2 bg-gold-500 hover:bg-gold-400 text-white font-semibold px-8 py-4 rounded-xl transition-colors">
@@ -84,18 +84,13 @@ export default function DienstenPage() {
           </div>
 
           <div className="relative">
-            {/* Verticale lijn */}
             <div className="absolute left-7 top-0 bottom-0 w-0.5 bg-gray-100" />
-
             <div className="space-y-6">
               {steps.map((s, i) => (
                 <div key={s.num} className="relative flex gap-6">
-                  {/* Icoon cirkel */}
                   <div className={`relative z-10 w-14 h-14 rounded-2xl border-2 ${s.accent} flex items-center justify-center flex-shrink-0 bg-white`}>
                     <s.icon size={22} />
                   </div>
-
-                  {/* Content card */}
                   <div className={`flex-1 bg-gray-50 rounded-2xl p-6 border border-gray-100 ${i === steps.length - 1 ? "" : "mb-0"}`}>
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-xs font-bold text-gray-400 tracking-widest">{s.num}</span>
@@ -114,7 +109,7 @@ export default function DienstenPage() {
       <section className="py-20 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <span className="text-gold-500 font-semibold text-sm uppercase tracking-widest">Koppelingen</span>
-          <h2 className="text-3xl font-bold text-navy-700 mt-3 mb-4">Wij koppelen uw systemen</h2>
+          <h2 className="text-3xl font-bold text-navy-700 mt-3 mb-4">Wij koppelen je systemen</h2>
           <p className="text-gray-500 mb-10">
             Khalaf BI ondersteunt de meest gebruikte MKB-softwarepakketten.
           </p>
@@ -138,7 +133,7 @@ export default function DienstenPage() {
         <div className="max-w-2xl mx-auto text-center px-4 relative">
           <h2 className="text-4xl font-bold text-white mb-4">Klaar om te starten?</h2>
           <p className="text-navy-200 mb-8 text-lg">
-            Vraag een gratis demo aan en ontdek wat Khalaf BI voor uw bedrijf kan betekenen.
+            Vraag een gratis demo aan en ontdek wat Khalaf BI voor jouw bedrijf kan betekenen.
           </p>
           <Link href="/contact" className="inline-flex items-center gap-2 bg-gold-500 hover:bg-gold-400 text-white font-semibold px-8 py-4 rounded-xl transition-colors">
             Demo aanvragen <ArrowRight size={18} />

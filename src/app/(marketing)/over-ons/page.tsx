@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Award, Clock, Target, TrendingUp, Users } from "lucide-react";
 
 const stats = [
-  { value: "2+", label: "Klanten bediend" },
+  { value: "2+", label: "Tevreden klanten" },
   { value: "30u", label: "Tijdsbesparing per maand" },
   { value: "100%", label: "Maatwerk aanpak" },
   { value: "48u", label: "Reactietijd garantie" },
@@ -18,13 +18,13 @@ const waarden = [
   {
     icon: TrendingUp,
     title: "Aanpak",
-    desc: "Eerst begrijpen, dan bouwen. Wij starten altijd met een KPI-sessie zodat het dashboard écht bruikbaar is voor uw dagelijkse sturing.",
+    desc: "Eerst begrijpen, dan bouwen. Wij starten altijd met een KPI-sessie zodat het dashboard écht bruikbaar is voor jouw dagelijkse sturing.",
     accent: "bg-emerald-50 text-emerald-600",
   },
   {
     icon: Award,
     title: "Expertise",
-    desc: "Finance & Control × maatwerk dashboards × SQL. De combinatie die uw data omzet in concrete stuurinformatie.",
+    desc: "Finance & Control × maatwerk dashboards × SQL. De combinatie die jouw data omzet in concrete stuurinformatie.",
     accent: "bg-gold-500/10 text-gold-600",
   },
 ];
@@ -78,7 +78,7 @@ export default function OverOnsPage() {
                   Als Finance & Control student zag ik tijdens stages en gesprekken
                   met ondernemers steeds hetzelfde patroon: bedrijven die willen groeien,
                   maar hun eigen prestaties niet kunnen meten. Data staat verspreid over
-                  systemen, KPI's zijn onduidelijk en beslissingen worden te vaak op gevoel
+                  systemen, KPI&apos;s zijn onduidelijk en beslissingen worden te vaak op gevoel
                   genomen.
                 </p>
                 <p>
@@ -144,7 +144,7 @@ export default function OverOnsPage() {
             {[
               { icon: Clock, jaar: "2023", tekst: "Khalaf BI opgericht tijdens Finance & Control studie" },
               { icon: Users, jaar: "2024", tekst: "Eerste klanten: Areys Restaurant en Attiva Zorg live" },
-              { icon: TrendingUp, jaar: "2025", tekst: "Uitbreiding dienstverlening met realtime koppelingen" },
+              { icon: TrendingUp, jaar: "2025", tekst: "Uitbreiding dienstverlening met realtime koppelingen en AI-assistent" },
             ].map((m) => (
               <div key={m.jaar} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <div className="w-10 h-10 bg-navy-700 rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -164,7 +164,7 @@ export default function OverOnsPage() {
           style={{ backgroundImage: "radial-gradient(circle at 70% 50%, #C9A84C 0%, transparent 60%)" }} />
         <div className="max-w-2xl mx-auto text-center px-4 relative">
           <h2 className="text-4xl font-bold text-white mb-4">
-            Samen uw data op orde brengen?
+            Samen je data op orde brengen?
           </h2>
           <p className="text-navy-200 mb-8 text-lg">
             Neem contact op voor een vrijblijvend kennismakingsgesprek.
