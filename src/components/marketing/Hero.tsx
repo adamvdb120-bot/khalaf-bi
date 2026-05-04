@@ -111,7 +111,6 @@ export default function Hero() {
               {/* Header mockup */}
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <div className="text-white/90 font-semibold text-sm">Attiva Zorg</div>
                   <div className="text-white/40 text-xs mt-0.5">Financieel overzicht · 2025</div>
                 </div>
                 <div className="flex gap-2">
