@@ -37,6 +37,12 @@ const plMaand = [
   { maand: "Dec", omzet: 46000, cogs: 18400, bruto: 27600, opex: 12000, netto: 15600 },
 ].map((r) => ({ ...r, margePercent: Math.round((r.bruto / r.omzet) * 100) }));
 
+const plMaandMetRolling = plMaand.map((r, i, arr) => {
+  const window = arr.slice(Math.max(0, i - 2), i + 1);
+  const rolling = Math.round(window.reduce((s, x) => s + x.omzet, 0) / window.length);
+  return { ...r, rolling };
+});
+
 // ─── Balance sheet ────────────────────────────────────────────────────────────
 const balans = {
   activa: {
@@ -196,7 +202,7 @@ const SALES_SUGGESTIONS = [
 
 // ─── Tabs config ──────────────────────────────────────────────────────────────
 type MainTab = "finance" | "cashflow" | "sales";
-type FinanceSub = "overview" | "balans" | "cashflow" | "debcred" | "prognose";
+type FinanceSub = "overview" | "balans" | "cashflow" | "debcred" | "prognose" | "kosten" | "benchmark" | "breakeven";
 
 const MAIN_TABS: { id: MainTab; label: string; icon: React.ReactNode; sub: string }[] = [
   { id: "finance",  label: "Finance",      icon: <BarChart2 size={16} />,    sub: "P&L · Balans · Prognose" },
@@ -209,6 +215,9 @@ const FINANCE_SUBS: { id: FinanceSub; label: string }[] = [
   { id: "cashflow",  label: "Cash Flow" },
   { id: "debcred",   label: "Debiteuren & Crediteuren" },
   { id: "prognose",  label: "Prognose" },
+  { id: "kosten",    label: "Kostenanalyse" },
+  { id: "benchmark", label: "Benchmarking" },
+  { id: "breakeven", label: "Break-even" },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -319,6 +328,9 @@ function FinanceTab({
           {financeSub === "cashflow"  && <CashflowSection />}
           {financeSub === "debcred"   && <DebCredSection />}
           {financeSub === "prognose"  && <PrognoseSection />}
+          {financeSub === "kosten"    && <KostenSection />}
+          {financeSub === "benchmark" && <BenchmarkSection />}
+          {financeSub === "breakeven" && <BreakevenSection />}
         </div>
 
         {/* Right panel: Smart Inzichten */}
@@ -432,11 +444,28 @@ function OverviewSection() {
         ))}
       </div>
 
+      {/* Extra KPIs */}
+      <div className="grid grid-cols-5 gap-3">
+        {[
+          { label: "DSO",                value: "32 dagen", sub: "Gem. betaaltermijn klanten", color: "#1B3A5C" },
+          { label: "Current Ratio",      value: "2.1",      sub: "Vlottend / kortlopend schuld", color: "#56a88f" },
+          { label: "Werkkapitaal",       value: "€191.000", sub: "Vlottend activa – kortlopend", color: "#3d7ac8" },
+          { label: "EBITDA",             value: "€221.000", sub: "Winst voor rente & afschr.", color: "#C9A84C" },
+          { label: "Kosten/€ omzet",     value: "€0,65",    sub: "Per euro omzet aan kosten",  color: "#e07b39" },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{k.label}</p>
+            <p className="text-lg font-bold" style={{ color: k.color }}>{k.value}</p>
+            <p className="text-[10px] text-gray-400 mt-1">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+
       {/* ComposedChart: bars + line */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <h3 className="font-bold text-[#1B3A5C] mb-4 text-sm">Omzet, COGS & Brutomarge %</h3>
         <ResponsiveContainer width="100%" height={240}>
-          <ComposedChart data={plMaand}>
+          <ComposedChart data={plMaandMetRolling}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis dataKey="maand" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
             <YAxis yAxisId="left"  tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={axisFmt} />
@@ -449,6 +478,7 @@ function OverviewSection() {
             <Bar yAxisId="left" dataKey="omzet" fill="#1B3A5C" name="Omzet" radius={[3,3,0,0]} />
             <Bar yAxisId="left" dataKey="cogs"  fill="#C9A84C" name="COGS"  radius={[3,3,0,0]} />
             <Line yAxisId="right" type="monotone" dataKey="margePercent" stroke="#56a88f" strokeWidth={2} dot={false} name="Marge %" />
+            <Line yAxisId="left" type="monotone" dataKey="rolling" stroke="#94a3b8" strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="3-mnd gem." />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -479,6 +509,81 @@ function OverviewSection() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Waterfall chart */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-1 text-sm">Watervaldiagram — waar blijft het geld?</h3>
+        <p className="text-xs text-gray-400 mb-4">Van omzet naar nettoresultaat — elke stap laat zien wat er afvalt</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart
+            data={[
+              { name: "Omzet",           base: 0,      value: 560000, fill: "#1B3A5C" },
+              { name: "– COGS",          base: 336000,  value: 224000, fill: "#e07b39" },
+              { name: "Brutomarge",      base: 0,      value: 336000, fill: "#56a88f" },
+              { name: "– OPEX",          base: 194400,  value: 141600, fill: "#C9A84C" },
+              { name: "Nettoresultaat",  base: 0,      value: 194400, fill: "#3d7ac8" },
+            ]}
+            margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={axisFmt} />
+            <Tooltip
+              formatter={(v: unknown, name: unknown) => (name as string) === "base" ? null : euro(v as number)}
+              contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
+            />
+            <Bar dataKey="base" stackId="a" fill="transparent" />
+            <Bar dataKey="value" stackId="a" radius={[4,4,0,0]}
+              label={{ position: "top", formatter: (v: unknown) => euro(v as number), fontSize: 10, fill: "#374151" }}>
+              {[
+                { fill: "#1B3A5C" },
+                { fill: "#e07b39" },
+                { fill: "#56a88f" },
+                { fill: "#C9A84C" },
+                { fill: "#3d7ac8" },
+              ].map((entry, i) => (
+                <Cell key={i} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Heatmap */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-1 text-sm">Prestatie heatmap per maand</h3>
+        <p className="text-xs text-gray-400 mb-4">Groen = boven gemiddelde · Rood = onder gemiddelde</p>
+        <div className="grid grid-cols-12 gap-1.5">
+          {plMaand.map((r) => {
+            const avg = 560000 / 12; // ~46.667
+            const pct = (r.omzet - avg) / avg;
+            const bg = pct >= 0.1 ? "#dcfce7" : pct >= 0 ? "#f0fdf4" : pct >= -0.1 ? "#fff7ed" : "#fee2e2";
+            const text = pct >= 0.1 ? "#166534" : pct >= 0 ? "#15803d" : pct >= -0.1 ? "#9a3412" : "#991b1b";
+            return (
+              <div key={r.maand} className="flex flex-col items-center gap-1">
+                <div
+                  className="w-full rounded-lg p-2 text-center"
+                  style={{ backgroundColor: bg }}
+                >
+                  <p className="text-[10px] font-bold" style={{ color: text }}>{r.maand}</p>
+                  <p className="text-[11px] font-bold mt-0.5" style={{ color: text }}>
+                    {(r.omzet / 1000).toFixed(0)}K
+                  </p>
+                  <p className="text-[9px]" style={{ color: text }}>
+                    {pct >= 0 ? "+" : ""}{(pct * 100).toFixed(0)}%
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-400">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-[#dcfce7] inline-block"/>+10% of meer</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-[#f0fdf4] inline-block"/>0–10%</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-[#fff7ed] inline-block"/>0 tot -10%</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-[#fee2e2] inline-block"/>-10% of meer</span>
         </div>
       </div>
     </div>
@@ -968,6 +1073,229 @@ function InsightsCard({ items }: { items: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// ─── 6. Kosten ────────────────────────────────────────────────────────────────
+function KostenSection() {
+  const kostenData = [
+    { maand: "Jan", personeel: 6500, inkoop: 2800, huur: 1800, marketing: 800, overig: 600 },
+    { maand: "Feb", personeel: 6500, inkoop: 3100, huur: 1800, marketing: 900, overig: 700 },
+    { maand: "Mrt", personeel: 6800, inkoop: 3500, huur: 1800, marketing: 1100, overig: 800 },
+    { maand: "Apr", personeel: 6800, inkoop: 3700, huur: 1800, marketing: 1200, overig: 900 },
+    { maand: "Mei", personeel: 7000, inkoop: 4000, huur: 1800, marketing: 1300, overig: 900 },
+    { maand: "Jun", personeel: 7000, inkoop: 4300, huur: 1800, marketing: 1400, overig: 900 },
+    { maand: "Jul", personeel: 7200, inkoop: 3200, huur: 1800, marketing: 900, overig: 800 },
+    { maand: "Aug", personeel: 7200, inkoop: 3000, huur: 1800, marketing: 700, overig: 800 },
+    { maand: "Sep", personeel: 7200, inkoop: 3800, huur: 1800, marketing: 1100, overig: 900 },
+    { maand: "Okt", personeel: 7500, inkoop: 4400, huur: 1800, marketing: 1400, overig: 900 },
+    { maand: "Nov", personeel: 7500, inkoop: 4600, huur: 1800, marketing: 1500, overig: 1000 },
+    { maand: "Dec", personeel: 7500, inkoop: 3600, huur: 1800, marketing: 1100, overig: 1100 },
+  ];
+  const totaalPerCat = [
+    { name: "Personeel", value: 85700, pct: 60 },
+    { name: "Inkoop",    value: 44000, pct: 31 },
+    { name: "Huur",      value: 21600, pct: 15 },
+    { name: "Marketing", value: 12400, pct: 9  },
+    { name: "Overig",    value: 10100, pct: 7  },
+  ];
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-[#1B3A5C]">Kostenanalyse 2025</h2>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Totale kosten",       value: "€365.800", sub: "Alle categorieën 2025" },
+          { label: "Grootste kostenpost", value: "Personeel", sub: "60% van totale kosten" },
+          { label: "Kosten/omzet ratio",  value: "65,3%",    sub: "Per euro omzet €0,65 kosten" },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{k.label}</p>
+            <p className="text-xl font-bold text-[#1B3A5C]">{k.value}</p>
+            <p className="text-[10px] text-gray-400 mt-1">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-4 text-sm">Kosten per categorie per maand</h3>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={kostenData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+            <XAxis dataKey="maand" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={axisFmt} />
+            <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+            <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="personeel" stackId="a" fill="#1B3A5C" name="Personeel" />
+            <Bar dataKey="inkoop"    stackId="a" fill="#C9A84C" name="Inkoop" />
+            <Bar dataKey="huur"      stackId="a" fill="#3d7ac8" name="Huur" />
+            <Bar dataKey="marketing" stackId="a" fill="#e07b39" name="Marketing" />
+            <Bar dataKey="overig"    stackId="a" fill="#56a88f" name="Overig" radius={[3,3,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-4 text-sm">Verdeling totale kosten</h3>
+        <div className="space-y-3">
+          {totaalPerCat.map((r) => (
+            <div key={r.name} className="flex items-center gap-3">
+              <div className="w-24 shrink-0 text-xs text-gray-600 font-medium">{r.name}</div>
+              <div className="flex-1 bg-gray-100 rounded-full h-3">
+                <div className="h-3 rounded-full bg-[#1B3A5C]" style={{ width: `${r.pct}%` }} />
+              </div>
+              <div className="w-20 text-right text-xs font-bold text-[#1B3A5C]">{euro(r.value)}</div>
+              <div className="w-8 text-right text-xs text-gray-400">{r.pct}%</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── 7. Benchmark ─────────────────────────────────────────────────────────────
+function BenchmarkSection() {
+  const benchmarkData = [
+    { metric: "Brutomarge",   eigen: 60,  branche: 45, eenheid: "%" },
+    { metric: "Nettomarge",   eigen: 34.7,branche: 12, eenheid: "%" },
+    { metric: "OPEX ratio",   eigen: 25.3,branche: 33, eenheid: "%" },
+    { metric: "DSO",          eigen: 32,  branche: 45, eenheid: " d" },
+    { metric: "Current ratio",eigen: 2.1, branche: 1.5,eenheid: "x" },
+  ];
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-[#1B3A5C]">Benchmarking — jij vs. branchegemiddelde</h2>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Beter dan gemiddelde", value: "4 van 5", sub: "KPI's boven branchenorm", color: "#56a88f" },
+          { label: "Brutomarge voordeel",  value: "+15%",    sub: "Boven branchegemiddelde", color: "#56a88f" },
+          { label: "Nettomarge voordeel",  value: "+22,7%",  sub: "Sterk bovengemiddeld",   color: "#56a88f" },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{k.label}</p>
+            <p className="text-xl font-bold" style={{ color: k.color }}>{k.value}</p>
+            <p className="text-[10px] text-gray-400 mt-1">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-4 text-sm">Jij vs. branchegemiddelde per KPI</h3>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={benchmarkData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+            <YAxis dataKey="metric" type="category" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} width={90} />
+            <Tooltip contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+            <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="eigen"   fill="#1B3A5C" name="Uw bedrijf"         radius={[0,4,4,0]} />
+            <Bar dataKey="branche" fill="#94a3b8" name="Branchegemiddelde"  radius={[0,4,4,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-4 text-sm">Gedetailleerde vergelijking</h3>
+        <div className="space-y-4">
+          {benchmarkData.map((r) => {
+            const isBeter = r.metric === "DSO" || r.metric === "OPEX ratio"
+              ? r.eigen < r.branche
+              : r.eigen > r.branche;
+            return (
+              <div key={r.metric} className="flex items-center gap-4">
+                <div className="w-28 shrink-0 text-xs font-medium text-gray-600">{r.metric}</div>
+                <div className="flex-1 flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#1B3A5C]">{r.eigen}{r.eenheid}</span>
+                  <span className="text-xs text-gray-400">vs. {r.branche}{r.eenheid} branche</span>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBeter ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                  {isBeter ? "✓ Beter" : "✗ Onder gem."}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── 8. Break-even ────────────────────────────────────────────────────────────
+function BreakevenSection() {
+  const vaste = 163200; // huur + deel personeel + afschrijvingen
+  const variabelePct = 0.40; // 40% van omzet zijn variabele kosten (COGS)
+  const breakeven = Math.round(vaste / (1 - variabelePct)); // = 272.000
+  const huidigeOmzet = 560000;
+  const buffer = huidigeOmzet - breakeven;
+  const breakevenData = [0, 50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000, 560000].map((omzet) => ({
+    omzet,
+    kosten: Math.round(vaste + omzet * variabelePct),
+    omzetLijn: omzet,
+  }));
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-[#1B3A5C]">Break-even analyse 2025</h2>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Break-even omzet",   value: "€272.000", sub: "Minimale omzet om quitte te spelen", color: "#e07b39" },
+          { label: "Huidige omzet",      value: "€560.000", sub: "Werkelijke omzet 2025",             color: "#1B3A5C" },
+          { label: "Veiligheidsmarge",   value: "€288.000", sub: "Buffer boven break-even (51%)",     color: "#56a88f" },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{k.label}</p>
+            <p className="text-xl font-bold" style={{ color: k.color }}>{k.value}</p>
+            <p className="text-[10px] text-gray-400 mt-1">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-1 text-sm">Break-even grafiek</h3>
+        <p className="text-xs text-gray-400 mb-4">Kruispunt = break-even punt. Rechts van het kruispunt = winst, links = verlies.</p>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={breakevenData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="omzet" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={axisFmt} />
+            <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={axisFmt} />
+            <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+            <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
+            <Line type="monotone" dataKey="kosten"    stroke="#e07b39" strokeWidth={2.5} dot={false} name="Totale kosten" />
+            <Line type="monotone" dataKey="omzetLijn" stroke="#1B3A5C" strokeWidth={2.5} dot={false} name="Omzet" />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-[#1B3A5C] mb-3 text-sm">Kostenstructuur</h3>
+        <div className="grid grid-cols-2 gap-6">
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2">Vaste kosten</p>
+            {[
+              { naam: "Personeel (vast deel)", bedrag: 84000 },
+              { naam: "Huur & huisvesting",    bedrag: 21600 },
+              { naam: "Afschrijvingen",        bedrag: 32400 },
+              { naam: "Overige vaste kosten",  bedrag: 25200 },
+            ].map((r) => (
+              <div key={r.naam} className="flex justify-between text-xs py-1.5 border-b border-gray-50">
+                <span className="text-gray-600">{r.naam}</span>
+                <span className="font-bold text-[#1B3A5C]">{euro(r.bedrag)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-xs py-2 font-bold">
+              <span className="text-gray-700">Totaal vast</span>
+              <span className="text-[#e07b39]">€163.200</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2">Variabele kosten</p>
+            {[
+              { naam: "Inkoop / COGS", bedrag: "40% van omzet" },
+              { naam: "Variabel personeel", bedrag: "bij groei" },
+              { naam: "Marketing variabel", bedrag: "bij campagnes" },
+            ].map((r) => (
+              <div key={r.naam} className="flex justify-between text-xs py-1.5 border-b border-gray-50">
+                <span className="text-gray-600">{r.naam}</span>
+                <span className="font-bold text-[#C9A84C]">{r.bedrag}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
