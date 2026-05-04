@@ -32,7 +32,7 @@ export default async function AttivaDashboard() {
           <img src="/logos/attiva.svg" alt="Attiva Zorg" className="w-full h-full object-contain" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold text-navy-700">Attiva Zorg</h1>
+          <h1 className="text-3xl font-bold text-navy-700"></h1>
           <p className="text-gray-400 text-sm">
             Zorgorganisatie ·{" "}
             {isConnected
