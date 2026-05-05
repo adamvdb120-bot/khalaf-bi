@@ -99,15 +99,27 @@ export default function AttivaCharts() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [maand, setMaand] = useState<string | null>(null);
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
+  const [autoFallback, setAutoFallback] = useState<number | null>(null);
 
-  async function load(j: number, forceRefresh = false) {
+  async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
     setError(null);
+    if (!isFallback) setAutoFallback(null);
     try {
       const res = await fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`);
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
-      setData(json.huidig ?? json);
+      const huidig = json.huidig ?? json;
+      const heeftData = huidig?.pl && huidig.pl.length > 0;
+
+      // Auto-fallback: geen data voor dit jaar → probeer vorig jaar
+      if (!heeftData && !isFallback && j > 2024) {
+        setAutoFallback(j);
+        setJaar(j - 1);
+        return; // useEffect triggert load(j-1)
+      }
+
+      setData(huidig);
       setVorigData(json.vorig ?? null);
       setLastUpdated(new Date());
     } catch (e) {
@@ -394,6 +406,16 @@ export default function AttivaCharts() {
           />
         </div>
       </div>
+
+      {autoFallback && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+          <span>Geen data gevonden voor <strong>{autoFallback}</strong> — data van <strong>{jaar}</strong> wordt weergegeven.</span>
+          <button onClick={() => { setAutoFallback(null); setJaar(autoFallback); }} className="ml-auto text-xs underline hover:no-underline">
+            Toch {autoFallback} proberen
+          </button>
+        </div>
+      )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
       {/* KPI Cards */}
@@ -722,6 +744,7 @@ export default function AttivaCharts() {
       {maandData.length === 0 && kostenPerCategorie.length === 0 && (
         <div className="card text-center py-16 text-gray-400">
           <p>Geen financiële data gevonden voor {data.jaar} in Exact Online.</p>
+          <p className="text-sm text-gray-400 mt-2">Selecteer een ander jaar of controleer de Exact Online koppeling.</p>
         </div>
       )}
 
