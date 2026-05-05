@@ -200,6 +200,66 @@ const SALES_SUGGESTIONS = [
   "Maak een grafiek van omzet per klant",
 ];
 
+// ─── Smart Inzichten per sectie ───────────────────────────────────────────────
+const SMART_INZICHTEN: Record<string, { icon: string; text: string }[]> = {
+  overview: [
+    { icon: "🏆", text: "Juni was de beste maand met €55.000 omzet en €20.800 nettoresultaat." },
+    { icon: "📊", text: "De brutomarge is stabiel rond 60% — kosten schalen goed mee met omzet." },
+    { icon: "🌤️", text: "Q3 (jul-aug) laat een seizoensdip zien — omzet 25% lager dan Q2." },
+    { icon: "💡", text: "EBITDA van €221.000 toont sterke operationele winstgevendheid." },
+    { icon: "📈", text: "Nettomarge van 34,7% ligt ruim boven het branchegemiddelde van 12%." },
+  ],
+  balans: [
+    { icon: "✅", text: "Current ratio van 2,1 — voor elke €1 schuld is er €2,10 aan vlottende activa." },
+    { icon: "💰", text: "Eigen vermogen €247.000 — solide buffer voor tegenslagen of investeringen." },
+    { icon: "⚠️", text: "Bankschuld €120.000 is de grootste post — bewak de rentelasten." },
+    { icon: "📦", text: "Voorraad €42.000 — controleer of dit efficiënt omloopt (geen dode voorraad)." },
+    { icon: "🏗️", text: "Solvabiliteitsratio: 53% eigen vermogen — financieel gezonde positie." },
+  ],
+  cashflow: [
+    { icon: "⚠️", text: "Augustus had de laagste cashflow (€3.000 netto) — zomerdip in inkomsten." },
+    { icon: "📈", text: "Cumulatieve cashflow steeg elk kwartaal — stabiele groei over het jaar." },
+    { icon: "💡", text: "Mei t/m juni en okt t/m nov zijn de sterkste cashflow maanden." },
+    { icon: "🏦", text: "Eindbalans €128.000 geeft ruimte voor investeringen in Q1 volgend jaar." },
+    { icon: "🔍", text: "Uitgaven zijn stabiel rond €30-39k per maand — geen grote uitschieters." },
+  ],
+  debcred: [
+    { icon: "⚠️", text: "€18.000 aan debiteuren staat langer dan 60 dagen open — stuur een herinnering." },
+    { icon: "🔴", text: "Zorg Plus (€5.000, 78 dagen) is het grootste risico op oninbaarheid." },
+    { icon: "✅", text: "Crediteuren €38.000 — ruim binnen betalingstermijnen, geen risico op boetes." },
+    { icon: "📊", text: "DSO van 32 dagen is beter dan het branchegemiddelde van 45 dagen." },
+    { icon: "💡", text: "Overweeg automatische betalingsherinneringen voor facturen ouder dan 30 dagen." },
+  ],
+  prognose: [
+    { icon: "📈", text: "Jaarverwachting €619.000 — 10,5% groei ten opzichte van dit jaar." },
+    { icon: "🎯", text: "Op basis van het huidige tempo wordt de €600k grens in november gehaald." },
+    { icon: "💡", text: "Q4 prognose is conservatief — historisch is december altijd sterker dan verwacht." },
+    { icon: "⚠️", text: "Let op: de prognose gaat uit van gelijkblijvende marges in Q4." },
+    { icon: "🏆", text: "Als de trend doorzet, kan de jaarverwachting oplopen naar €640.000." },
+  ],
+  kosten: [
+    { icon: "👥", text: "Personeel is 60% van de totale kosten — de grootste hefboom voor margeverbering." },
+    { icon: "📦", text: "Inkoopkosten stijgen mee met omzet — gezond signaal van variabele structuur." },
+    { icon: "💡", text: "Marketingbudget (9%) is relatief laag — ruimte om meer in groei te investeren." },
+    { icon: "✅", text: "Huurkosten zijn vast op €1.800/mnd — geen verrassing in de kostenbasis." },
+    { icon: "🔍", text: "Kosten/omzet ratio van 65,3% — voor elke €1 omzet ga je €0,65 aan kosten uit." },
+  ],
+  benchmark: [
+    { icon: "🏆", text: "Brutomarge 60% vs. 45% branchegemiddelde — 15% beter dan concurrenten." },
+    { icon: "🏆", text: "Nettomarge 34,7% vs. 12% branche — uitstekende kostenbeheersing." },
+    { icon: "✅", text: "DSO 32 dagen vs. 45 dagen branche — klanten betalen sneller dan gemiddeld." },
+    { icon: "✅", text: "Current ratio 2,1 vs. 1,5 branche — betere liquiditeitspositie." },
+    { icon: "⚠️", text: "OPEX ratio 25,3% vs. 33% branche — je bent efficiënter dan de markt." },
+  ],
+  breakeven: [
+    { icon: "🎯", text: "Break-even ligt op €272.000 — je hebt dit al in april gehaald." },
+    { icon: "✅", text: "Veiligheidsmarge van €288.000 (51%) — zeer comfortabele positie." },
+    { icon: "💡", text: "Vaste kosten €163.200 — een omzetdaling van 51% kan je opvangen." },
+    { icon: "📊", text: "40% variabele kostenratio is gezond — kosten dalen bij lagere omzet." },
+    { icon: "🏆", text: "Je verdient elke euro boven €272.000 voor 60% als brutomarge." },
+  ],
+};
+
 // ─── Tabs config ──────────────────────────────────────────────────────────────
 type MainTab = "finance" | "cashflow" | "sales";
 type FinanceSub = "overview" | "balans" | "cashflow" | "debcred" | "prognose" | "kosten" | "benchmark" | "breakeven";
@@ -338,13 +398,7 @@ function FinanceTab({
           <p className="text-xs font-bold text-[#1B3A5C] uppercase tracking-widest mb-1">Smart Inzichten</p>
           <p className="text-[11px] text-gray-400 mb-4">Automatisch gegenereerd op basis van uw data</p>
           <div className="space-y-3">
-            {[
-              { icon: "🏆", text: "Juni was de beste maand met €55.000 omzet en €20.800 nettoresultaat." },
-              { icon: "📊", text: "De brutomarge is stabiel rond 60% — kosten schalen mee met omzet." },
-              { icon: "⚠️", text: "€18.000 aan debiteuren staat langer dan 60 dagen open — actie aanbevolen." },
-              { icon: "🌤️", text: "Q3 (jul-sep) laat een seizoensdip zien — plan cashreserves voor de zomer." },
-              { icon: "📈", text: "Jaarverwachting €619.000 ligt 10,5% boven vorig jaar (€560.000 tot nu)." },
-            ].map((item, i) => (
+            {SMART_INZICHTEN[financeSub].map((item, i) => (
               <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                 <p className="text-xs leading-relaxed text-gray-700">
                   <span className="mr-1">{item.icon}</span>
