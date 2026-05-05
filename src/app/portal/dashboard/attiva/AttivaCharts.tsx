@@ -553,29 +553,36 @@ export default function AttivaCharts() {
             Klik op een maand voor kostenuitsplitsing
           </p>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart
-              data={maandData}
-              barGap={4}
-              onClick={(e) => {
-                if (e?.activePayload?.[0]) {
-                  const clickedMaand = e.activePayload[0].payload.maand as string;
-                  const periodeNr = MAANDEN.indexOf(clickedMaand) + 1;
-                  if (periodeNr > 0) setDetailMaand(periodeNr);
-                }
-              }}
-              style={{ cursor: "pointer" }}
-            >
+            <BarChart data={maandData} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
               <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               <Legend iconType="circle" iconSize={8} />
-              <Bar dataKey="omzet" name="Omzet" radius={[5,5,0,0]}>
+              <Bar
+                dataKey="omzet"
+                name="Omzet"
+                radius={[5,5,0,0]}
+                style={{ cursor: "pointer" }}
+                onClick={(data: { maand: string }) => {
+                  const periodeNr = MAANDEN.indexOf(data.maand) + 1;
+                  if (periodeNr > 0) setDetailMaand(periodeNr);
+                }}
+              >
                 {maandData.map((entry, i) => (
                   <Cell key={i} fill={maand === null || maand === entry.maand ? "#1B3A5C" : "#cbd5e1"} />
                 ))}
               </Bar>
-              <Bar dataKey="kosten" name="Kosten" radius={[5,5,0,0]}>
+              <Bar
+                dataKey="kosten"
+                name="Kosten"
+                radius={[5,5,0,0]}
+                style={{ cursor: "pointer" }}
+                onClick={(data: { maand: string }) => {
+                  const periodeNr = MAANDEN.indexOf(data.maand) + 1;
+                  if (periodeNr > 0) setDetailMaand(periodeNr);
+                }}
+              >
                 {maandData.map((entry, i) => (
                   <Cell key={i} fill={maand === null || maand === entry.maand ? "#C9A84C" : "#e9ecef"} />
                 ))}
