@@ -100,6 +100,7 @@ export default function AttivaCharts() {
   const [maand, setMaand] = useState<string | null>(null);
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
   const [autoFallback, setAutoFallback] = useState<number | null>(null);
+  const [detailMaand, setDetailMaand] = useState<number | null>(null);
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -547,8 +548,23 @@ export default function AttivaCharts() {
       {maandData.length > 0 && (
         <div className="card">
           <h3 className="font-bold text-navy-700 mb-5">Omzet vs Kosten per maand — {data.jaar}</h3>
+          <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full bg-gold-500/60" />
+            Klik op een maand voor kostenuitsplitsing
+          </p>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={maandData} barGap={4}>
+            <BarChart
+              data={maandData}
+              barGap={4}
+              onClick={(e) => {
+                if (e?.activePayload?.[0]) {
+                  const clickedMaand = e.activePayload[0].payload.maand as string;
+                  const periodeNr = MAANDEN.indexOf(clickedMaand) + 1;
+                  if (periodeNr > 0) setDetailMaand(periodeNr);
+                }
+              }}
+              style={{ cursor: "pointer" }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
@@ -760,6 +776,155 @@ export default function AttivaCharts() {
           />
         </>
       )}
+
+      {/* Maand detail modal */}
+      {detailMaand !== null && data.pl && (
+        <MaandDetailModal
+          periode={detailMaand}
+          jaar={data.jaar}
+          pl={data.pl}
+          onClose={() => setDetailMaand(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Maand detail modal ───────────────────────────────────────────────────────
+function MaandDetailModal({
+  periode, jaar, pl, onClose,
+}: {
+  periode: number;
+  jaar: number;
+  pl: PlRow[];
+  onClose: () => void;
+}) {
+  const maandNaam = MAANDEN[periode - 1] ?? `Periode ${periode}`;
+
+  const omzetRijen = pl
+    .filter(r => r.Period === periode && r.IsRevenue)
+    .sort((a, b) => b.Amount - a.Amount);
+
+  const kostenRijen = pl
+    .filter(r => r.Period === periode && !r.IsRevenue)
+    .sort((a, b) => b.Amount - a.Amount);
+
+  const totaalOmzet = omzetRijen.reduce((s, r) => s + r.Amount, 0);
+  const totaalKosten = kostenRijen.reduce((s, r) => s + r.Amount, 0);
+  const netto = totaalOmzet - totaalKosten;
+
+  function euro(v: number) {
+    return `€ ${Math.round(v).toLocaleString("nl-NL")}`;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-navy-700 text-lg">{maandNaam} {jaar}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">W&V uitsplitsing per grootboekrekening</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* KPI row */}
+        <div className="grid grid-cols-3 gap-3 px-6 py-4 border-b border-gray-50">
+          {[
+            { label: "Omzet",       value: totaalOmzet, color: "text-navy-700" },
+            { label: "Kosten",      value: totaalKosten, color: "text-gold-600" },
+            { label: "Resultaat",   value: netto,        color: netto >= 0 ? "text-emerald-600" : "text-red-500" },
+          ].map(k => (
+            <div key={k.label} className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">{k.label}</p>
+              <p className={`text-base font-bold ${k.color}`}>{euro(k.value)}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+
+          {/* Kostenposten */}
+          {kostenRijen.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                Kostenposten — {euro(totaalKosten)}
+              </p>
+              <div className="space-y-2">
+                {kostenRijen.map((r, i) => {
+                  const pct = totaalKosten > 0 ? (r.Amount / totaalKosten) * 100 : 0;
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs text-gray-700 font-medium truncate pr-2">{r.Description}</span>
+                          <span className="text-xs font-bold text-navy-700 flex-shrink-0">{euro(r.Amount)}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gold-500 transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-gray-400 w-8 text-right flex-shrink-0">{pct.toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Omzetposten */}
+          {omzetRijen.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                Omzetposten — {euro(totaalOmzet)}
+              </p>
+              <div className="space-y-2">
+                {omzetRijen.map((r, i) => {
+                  const pct = totaalOmzet > 0 ? (r.Amount / totaalOmzet) * 100 : 0;
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs text-gray-700 font-medium truncate pr-2">{r.Description}</span>
+                          <span className="text-xs font-bold text-navy-700 flex-shrink-0">{euro(r.Amount)}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-navy-700 transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-gray-400 w-8 text-right flex-shrink-0">{pct.toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {kostenRijen.length === 0 && omzetRijen.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-8">Geen detaildata beschikbaar voor deze maand.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
