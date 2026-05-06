@@ -10,7 +10,6 @@ import { useEffect, useState } from "react";
 const nav = [
   { href: "/portal", label: "Overzicht", icon: Home, exact: true },
   { href: "/portal/data-uploaden", label: "Data uploaden", icon: Upload, exact: false },
-  { href: "/portal/instellingen", label: "Instellingen", icon: Settings, exact: false },
 ];
 
 export default function Sidebar() {
