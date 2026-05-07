@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart2, FileText, TrendingUp } from "lucide-react";
+import { BarChart2, FileText, TrendingUp, Wallet } from "lucide-react";
 import AttivaCharts from "./AttivaCharts";
 import DeclaratiesSection from "./DeclaratiesSection";
 import CashflowSection from "./CashflowSection";
+import CrediteurenSection from "./CrediteurenSection";
 
 const TABS = [
   { id: "financieel", label: "Financieel overzicht", icon: BarChart2 },
   { id: "cashflow", label: "Cashflow", icon: TrendingUp },
+  { id: "crediteuren", label: "Crediteuren", icon: Wallet },
   { id: "declaraties", label: "Declaratieoverzicht", icon: FileText },
 ];
 
@@ -66,6 +68,26 @@ export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
               <h2 className="text-xl font-bold text-navy-700 mb-2">Koppel Exact Online</h2>
               <p className="text-gray-400 text-sm max-w-md mx-auto">
                 Verbind Exact Online met dit dashboard om cashflow gegevens te bekijken.
+              </p>
+            </div>
+            <a href="/api/exact/auth"
+              className="inline-flex items-center gap-2 bg-navy-700 hover:bg-navy-600 text-white font-semibold px-8 py-3 rounded-xl transition-colors">
+              Koppel Exact Online
+            </a>
+          </div>
+        )
+      )}
+
+      {active === "crediteuren" && (
+        isConnected ? <CrediteurenSection /> : (
+          <div className="card text-center py-20 space-y-6">
+            <div className="w-16 h-16 bg-navy-700/5 rounded-2xl flex items-center justify-center mx-auto">
+              <Wallet size={28} className="text-navy-700" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-navy-700 mb-2">Koppel Exact Online</h2>
+              <p className="text-gray-400 text-sm max-w-md mx-auto">
+                Verbind Exact Online met dit dashboard om crediteuren en openstaande facturen te bekijken.
               </p>
             </div>
             <a href="/api/exact/auth"
