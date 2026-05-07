@@ -61,24 +61,18 @@ export default function CrediteurenSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
-  const [autoFallback, setAutoFallback] = useState<number | null>(null);
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
 
-  async function load(j: number, forceRefresh = false, isFallback = false) {
+  async function load(j: number, forceRefresh = false) {
     setLoading(true);
     setError(null);
-    if (!isFallback) setAutoFallback(null);
     try {
-      const res = await fetch(`/api/exact/data?jaar=${j}${forceRefresh ? "&refresh=1" : ""}`);
+      // Crediteuren-data uit Exact PayablesList is real-time (niet jaar-afhankelijk),
+      // maar we delen de cache met de Financieel-tab via dezelfde cache-key
+      const res = await fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`);
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
       const huidig = json.huidig ?? json;
-      const heeftData = huidig?.crediteuren && huidig.crediteuren.length > 0;
-      if (!heeftData && !isFallback && j > 2024) {
-        setAutoFallback(j);
-        setJaar(j - 1);
-        return;
-      }
       setData(huidig);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Onbekende fout");
@@ -187,16 +181,21 @@ export default function CrediteurenSection() {
         </button>
       </div>
 
-      {autoFallback && (
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
-          <span>Geen crediteurendata voor <strong>{autoFallback}</strong> — data van <strong>{jaar}</strong> wordt weergegeven.</span>
-        </div>
-      )}
-
       {crediteuren.length === 0 ? (
-        <div className="card text-center py-16 text-gray-400">
-          <p>Geen openstaande crediteuren gevonden.</p>
+        <div className="card text-center py-16 space-y-4">
+          <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto">
+            <Wallet size={26} className="text-emerald-500" />
+          </div>
+          <div>
+            <p className="font-semibold text-navy-700">Geen openstaande crediteuren</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Volgens Exact Online staan er nu geen onbetaalde crediteurenfacturen open.
+            </p>
+          </div>
+          <button onClick={() => load(jaar, true)}
+            className="inline-flex items-center gap-2 text-sm bg-navy-700 hover:bg-navy-600 text-white font-semibold px-5 py-2 rounded-xl transition-colors">
+            <RefreshCw size={14} /> Forceer vernieuwen
+          </button>
         </div>
       ) : (
         <>
