@@ -290,6 +290,14 @@ export default function AttivaCharts() {
     .map(d => ({ ...d, totaal: (d.Age0to30??0)+(d.Age31to60??0)+(d.Age61to90??0)+(d.Age90Plus??0) }))
     .filter(d => d.totaal > 0).sort((a, b) => b.totaal - a.totaal).slice(0, 5);
 
+  // Omzet per categorie (uit P&L revenue-rijen, gegroepeerd op grootboekomschrijving)
+  const omzetPerCategorie = Object.entries(
+    (data.pl ?? [])
+      .filter(r => r.IsRevenue && (selectedPeriod === null || r.Period === selectedPeriod))
+      .reduce((acc, r) => { acc[r.Description] = (acc[r.Description] ?? 0) + r.Amount; return acc; }, {} as Record<string, number>)
+  ).map(([name, value]) => ({ name, value: Math.round(value) }))
+    .filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 10);
+
   const topCrediteuren = (data.crediteuren ?? [])
     .map(d => ({ ...d, totaal: (d.Age0to30??0)+(d.Age31to60??0)+(d.Age61to90??0)+(d.Age90Plus??0) }))
     .filter(d => d.totaal > 0).sort((a, b) => b.totaal - a.totaal).slice(0, 5);
@@ -706,9 +714,38 @@ export default function AttivaCharts() {
         </div>
       )}
 
-      {/* Debiteuren & Crediteuren */}
-      {(topDebiteuren.length > 0 || topCrediteuren.length > 0) && (
+      {/* Debiteuren (of Omzet per categorie als debiteuren leeg) & Crediteuren */}
+      {(topDebiteuren.length > 0 || topCrediteuren.length > 0 || omzetPerCategorie.length > 0) && (
         <div className="grid grid-cols-2 gap-5">
+          {topDebiteuren.length === 0 && omzetPerCategorie.length > 0 && (
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-navy-700">
+                  {maand ? `Omzet per categorie — ${maand}` : "Omzet per categorie"}
+                </h3>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+                  {euro(omzetPerCategorie.reduce((s, c) => s + c.value, 0))} totaal
+                </span>
+              </div>
+              <div className="space-y-3">
+                {omzetPerCategorie.map((c, i) => {
+                  const max = omzetPerCategorie[0].value;
+                  return (
+                    <div key={c.name}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="w-5 h-5 rounded-full bg-navy-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                        <span className="text-sm text-navy-700 font-medium flex-1 truncate" title={c.name}>{c.name}</span>
+                        <span className="font-bold text-navy-700 text-sm flex-shrink-0">{euro(c.value)}</span>
+                      </div>
+                      <div className="ml-7 h-1 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-navy-700 rounded-full transition-all" style={{ width: `${(c.value / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {topDebiteuren.length > 0 && (
             <div className="card">
               <div className="flex items-center justify-between mb-4">
