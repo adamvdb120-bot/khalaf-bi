@@ -139,6 +139,57 @@ function buildPl(balances: unknown[] | null) {
   return pl;
 }
 
+// Exact Online retourneert datums als "/Date(1234567890000)/"
+function parseExactDate(s: string | undefined | null): number | null {
+  if (!s) return null;
+  const m = /\/Date\((-?\d+)\)\//.exec(s);
+  if (m) return parseInt(m[1], 10);
+  const t = Date.parse(s);
+  return isNaN(t) ? null : t;
+}
+
+// PayablesList/ReceivablesList = factuurregels. Aggregeer naar aging-buckets per account.
+function buildAgedList(invoices: unknown[] | null) {
+  if (!Array.isArray(invoices)) return [];
+  const today = Date.now();
+  const map: Record<string, {
+    Name: string; AccountCode: string;
+    Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number;
+  }> = {};
+
+  for (const raw of invoices) {
+    const inv = raw as {
+      AccountName?: string; AccountCode?: string; Description?: string;
+      AmountDC?: number; AmountFC?: number; Amount?: number;
+      DueDate?: string; InvoiceDate?: string; EntryDate?: string;
+    };
+    const naam = inv.AccountName || inv.AccountCode || inv.Description || "Onbekend";
+    const code = inv.AccountCode || "";
+    // Open bedrag in default currency. Sommige endpoints retourneren AmountDC, andere Amount.
+    const amount = Number(inv.AmountDC ?? inv.Amount ?? inv.AmountFC ?? 0);
+    if (amount === 0) continue;
+
+    const dueMs = parseExactDate(inv.DueDate ?? inv.InvoiceDate ?? inv.EntryDate);
+    const daysOverdue = dueMs !== null ? Math.floor((today - dueMs) / 86400000) : 0;
+
+    if (!map[naam]) {
+      map[naam] = { Name: naam, AccountCode: code, Age0to30: 0, Age31to60: 0, Age61to90: 0, Age90Plus: 0 };
+    }
+    if (daysOverdue <= 30) map[naam].Age0to30 += amount;
+    else if (daysOverdue <= 60) map[naam].Age31to60 += amount;
+    else if (daysOverdue <= 90) map[naam].Age61to90 += amount;
+    else map[naam].Age90Plus += amount;
+  }
+
+  return Object.values(map).map(r => ({
+    ...r,
+    Age0to30: Math.round(r.Age0to30),
+    Age31to60: Math.round(r.Age31to60),
+    Age61to90: Math.round(r.Age61to90),
+    Age90Plus: Math.round(r.Age90Plus),
+  }));
+}
+
 function buildOmzetPerKlant(facturen: unknown[] | null) {
   const map: Record<string, { naam: string; omzet: number }> = {};
   if (!Array.isArray(facturen)) return [];
@@ -255,8 +306,8 @@ export async function GET(req: Request) {
   const huidigeData = {
     division, jaar,
     pl: buildPl(balances),
-    debiteuren: Array.isArray(debiteuren) ? debiteuren : [],
-    crediteuren: Array.isArray(crediteuren) ? crediteuren : [],
+    debiteuren: buildAgedList(debiteuren),
+    crediteuren: buildAgedList(crediteuren),
     omzetPerKlant: [],
   };
 
