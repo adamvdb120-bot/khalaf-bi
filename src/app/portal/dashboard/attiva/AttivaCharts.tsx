@@ -1046,8 +1046,9 @@ function CategorieDetailModal({
     return () => { cancelled = true; };
   }, [categorie, jaar, type]);
 
-  // Filter alle rijen die bij deze categorie horen (zelfde Description, alleen omzet)
-  const rijen = pl.filter(r => r.IsRevenue && r.Description === categorie);
+  // Filter alle rijen die bij deze categorie horen — IsRevenue moet matchen met type
+  const isRevenueFilter = type === "omzet";
+  const rijen = pl.filter(r => r.IsRevenue === isRevenueFilter && r.Description === categorie);
   const totaal = rijen.reduce((s, r) => s + r.Amount, 0);
 
   // Per maand
@@ -1100,8 +1101,10 @@ function CategorieDetailModal({
             <p className="text-base font-bold text-navy-700">{euroL(totaal)}</p>
           </div>
           <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Beste maand</p>
-            <p className="text-base font-bold text-emerald-600">{beste.maand}</p>
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">
+              {isKosten ? "Hoogste maand" : "Beste maand"}
+            </p>
+            <p className={`text-base font-bold ${isKosten ? "text-red-500" : "text-emerald-600"}`}>{beste.maand}</p>
             <p className="text-[10px] text-gray-400">{euroL(beste.bedrag)}</p>
           </div>
           <div className="bg-gray-50 rounded-xl p-3 text-center">
@@ -1124,7 +1127,9 @@ function CategorieDetailModal({
                   <span className="text-xs text-gray-500 font-medium w-8 flex-shrink-0">{p.maand}</span>
                   <div className="flex-1 h-6 bg-gray-50 rounded-md relative overflow-hidden">
                     <div
-                      className={`h-full rounded-md transition-all ${isBeste ? "bg-emerald-500" : accentClass}`}
+                      className={`h-full rounded-md transition-all ${
+                        isBeste ? (isKosten ? "bg-red-500" : "bg-emerald-500") : accentClass
+                      }`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
