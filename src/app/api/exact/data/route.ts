@@ -303,11 +303,37 @@ export async function GET(req: Request) {
     });
   }
 
+  // Compacte raw rijen (alleen velden die we nodig hebben voor drilldown — bespaart cache-size)
+  function compactInvoice(arr: unknown[] | null) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(raw => {
+      const r = raw as {
+        AccountName?: string; AccountCode?: string; Description?: string;
+        AmountDC?: number; AmountFC?: number; Amount?: number;
+        DueDate?: string; InvoiceDate?: string; EntryDate?: string;
+        InvoiceNumber?: number | string; YourRef?: string;
+      };
+      return {
+        AccountName: r.AccountName ?? "",
+        AccountCode: r.AccountCode ?? "",
+        Description: r.Description ?? "",
+        Amount: Number(r.AmountDC ?? r.Amount ?? r.AmountFC ?? 0),
+        DueDate: r.DueDate ?? null,
+        InvoiceDate: r.InvoiceDate ?? null,
+        EntryDate: r.EntryDate ?? null,
+        InvoiceNumber: r.InvoiceNumber ?? null,
+        YourRef: r.YourRef ?? null,
+      };
+    });
+  }
+
   const huidigeData = {
     division, jaar,
     pl: buildPl(balances),
     debiteuren: buildAgedList(debiteuren),
     crediteuren: buildAgedList(crediteuren),
+    debiteurenRaw: compactInvoice(debiteuren),
+    crediteurenRaw: compactInvoice(crediteuren),
     omzetPerKlant: [],
   };
 

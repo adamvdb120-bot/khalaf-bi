@@ -11,14 +11,27 @@ import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 
 interface Crediteur {
   Name: string;
+  AccountCode?: string;
   Age0to30: number;
   Age31to60: number;
   Age61to90: number;
   Age90Plus: number;
 }
+interface RawFactuur {
+  AccountName: string;
+  AccountCode: string;
+  Description: string;
+  Amount: number;
+  DueDate: string | null;
+  InvoiceDate: string | null;
+  EntryDate: string | null;
+  InvoiceNumber: number | string | null;
+  YourRef: string | null;
+}
 interface ExactData {
   jaar: number;
   crediteuren: Crediteur[] | null;
+  crediteurenRaw?: RawFactuur[] | null;
 }
 
 function euro(v: number | string | undefined) {
@@ -62,6 +75,7 @@ export default function CrediteurenSection() {
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
+  const [detailCred, setDetailCred] = useState<{ name: string; code: string } | null>(null);
 
   async function load(j: number, forceRefresh = false) {
     setLoading(true);
@@ -292,7 +306,10 @@ export default function CrediteurenSection() {
 
           {/* Volledige tabel */}
           <div className="card">
-            <h3 className="font-bold text-navy-700 mb-5">Alle crediteuren ({crediteuren.length})</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-bold text-navy-700">Alle crediteuren ({crediteuren.length})</h3>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">Klik op een crediteur voor de openstaande facturen</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -310,7 +327,11 @@ export default function CrediteurenSection() {
                   {crediteuren.map((c) => {
                     const isUrgent = c.Age90Plus > 0;
                     return (
-                      <tr key={c.Name} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                      <tr
+                        key={c.Name}
+                        onClick={() => setDetailCred({ name: c.Name, code: c.AccountCode ?? "" })}
+                        className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
                         <td className="py-2.5 font-medium text-navy-700 truncate max-w-xs" title={c.Name}>
                           {c.Name}
                           {isUrgent && <span className="ml-2 text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-semibold">URGENT</span>}
@@ -349,6 +370,163 @@ export default function CrediteurenSection() {
           />
         </>
       )}
+
+      {/* Detail modal: openstaande facturen per crediteur */}
+      {detailCred && (
+        <CrediteurFacturenModal
+          crediteur={detailCred.name}
+          accountCode={detailCred.code}
+          facturen={data.crediteurenRaw ?? []}
+          onClose={() => setDetailCred(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Crediteur facturen modal ─────────────────────────────────────────────────
+function parseExactDate(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = /\/Date\((-?\d+)\)\//.exec(s);
+  if (m) return parseInt(m[1], 10);
+  const t = Date.parse(s);
+  return isNaN(t) ? null : t;
+}
+
+function fmtDate(s: string | null | undefined): string {
+  const ms = parseExactDate(s);
+  if (ms === null) return "—";
+  return new Date(ms).toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function CrediteurFacturenModal({
+  crediteur, accountCode, facturen, onClose,
+}: {
+  crediteur: string;
+  accountCode: string;
+  facturen: RawFactuur[];
+  onClose: () => void;
+}) {
+  // Filter facturen voor deze crediteur — primair op AccountCode, fallback op naam
+  const eigenFacturen = facturen.filter(f => {
+    if (accountCode && f.AccountCode) return f.AccountCode === accountCode;
+    return f.AccountName === crediteur;
+  });
+
+  // Verrijk met dagen-open en sorteer urgent eerst
+  const today = Date.now();
+  const verrijkt = eigenFacturen.map(f => {
+    const dueMs = parseExactDate(f.DueDate ?? f.InvoiceDate ?? f.EntryDate);
+    const daysOverdue = dueMs !== null ? Math.floor((today - dueMs) / 86400000) : 0;
+    return { ...f, daysOverdue };
+  }).sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  const totaal = verrijkt.reduce((s, f) => s + Math.abs(f.Amount), 0);
+  const aantal = verrijkt.length;
+  const urgent = verrijkt.filter(f => f.daysOverdue > 90).length;
+
+  function bucketKleur(dagen: number) {
+    if (dagen > 90) return { bg: "bg-red-50", text: "text-red-600", label: ">90 dagen" };
+    if (dagen > 60) return { bg: "bg-orange-50", text: "text-orange-600", label: "61-90 dagen" };
+    if (dagen > 30) return { bg: "bg-yellow-50", text: "text-yellow-600", label: "31-60 dagen" };
+    if (dagen >= 0) return { bg: "bg-emerald-50", text: "text-emerald-600", label: "0-30 dagen" };
+    return { bg: "bg-blue-50", text: "text-blue-600", label: "Niet vervallen" };
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="min-w-0 pr-3">
+            <h2 className="font-bold text-navy-700 text-lg truncate">{crediteur}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Openstaande facturen — peildatum {new Date().toLocaleDateString("nl-NL")}
+              {accountCode && <> · code {accountCode}</>}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors flex-shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* KPI row */}
+        <div className="grid grid-cols-3 gap-3 px-6 py-4 border-b border-gray-50">
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Totaal open</p>
+            <p className="text-base font-bold text-navy-700">{euro(totaal)}</p>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Facturen</p>
+            <p className="text-base font-bold text-navy-700">{aantal}</p>
+          </div>
+          <div className={`rounded-xl p-3 text-center ${urgent > 0 ? "bg-red-50" : "bg-gray-50"}`}>
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">{">"} 90 dagen</p>
+            <p className={`text-base font-bold ${urgent > 0 ? "text-red-600" : "text-navy-700"}`}>{urgent}</p>
+          </div>
+        </div>
+
+        {/* Facturen lijst */}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {verrijkt.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Geen factuurdetails beschikbaar.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                  <th className="text-left font-medium pb-2">Factuurnr</th>
+                  <th className="text-left font-medium pb-2">Omschrijving</th>
+                  <th className="text-left font-medium pb-2">Factuurdatum</th>
+                  <th className="text-left font-medium pb-2">Vervaldatum</th>
+                  <th className="text-right font-medium pb-2">Status</th>
+                  <th className="text-right font-medium pb-2">Bedrag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {verrijkt.map((f, i) => {
+                  const k = bucketKleur(f.daysOverdue);
+                  return (
+                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60">
+                      <td className="py-2.5 font-medium text-navy-700">
+                        {f.InvoiceNumber || f.YourRef || "—"}
+                      </td>
+                      <td className="py-2.5 text-gray-600 truncate max-w-[200px]" title={f.Description}>
+                        {f.Description || "—"}
+                      </td>
+                      <td className="py-2.5 text-gray-500 text-xs">{fmtDate(f.InvoiceDate)}</td>
+                      <td className="py-2.5 text-gray-500 text-xs">{fmtDate(f.DueDate)}</td>
+                      <td className="py-2.5 text-right">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${k.bg} ${k.text}`}>
+                          {f.daysOverdue >= 0 ? `${f.daysOverdue}d` : k.label}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right font-bold text-navy-700">
+                        {euro(Math.abs(f.Amount))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="font-bold text-navy-700">
+                  <td colSpan={5} className="pt-3 text-right text-sm">Totaal</td>
+                  <td className="pt-3 text-right">{euro(totaal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
