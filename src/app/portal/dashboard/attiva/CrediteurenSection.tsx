@@ -479,7 +479,19 @@ function CrediteurFacturenModal({
         {/* Facturen lijst */}
         <div className="overflow-y-auto flex-1 px-6 py-4">
           {verrijkt.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">Geen factuurdetails beschikbaar.</p>
+            facturen.length === 0 ? (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-6 text-center space-y-2">
+                <p className="text-sm font-semibold text-amber-800">Factuurdetails nog niet geladen</p>
+                <p className="text-xs text-amber-700">
+                  De gecachete data bevat geen factuur-uitsplitsing. Klik <strong>Vernieuwen</strong> rechtsboven
+                  (naast de jaartallen) om verse data uit Exact op te halen.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-8">
+                Geen facturen gevonden voor deze crediteur (filter op {accountCode ? `code ${accountCode}` : `naam "${crediteur}"`}).
+              </p>
+            )
           ) : (
             <table className="w-full text-sm">
               <thead>
