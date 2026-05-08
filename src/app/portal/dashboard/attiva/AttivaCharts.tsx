@@ -101,7 +101,7 @@ export default function AttivaCharts() {
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
   const [autoFallback, setAutoFallback] = useState<number | null>(null);
   const [detailMaand, setDetailMaand] = useState<number | null>(null);
-  const [detailCategorie, setDetailCategorie] = useState<string | null>(null);
+  const [detailCategorie, setDetailCategorie] = useState<{ naam: string; type: "omzet" | "kosten" } | null>(null);
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -696,10 +696,15 @@ export default function AttivaCharts() {
             </ResponsiveContainer>
           </div>
           <div className="card">
-            <h3 className="font-bold text-navy-700 mb-4">Top kostenposten</h3>
+            <h3 className="font-bold text-navy-700 mb-2">Top kostenposten</h3>
+            <p className="text-xs text-gray-400 mb-3">Klik op een kostenpost voor uitsplitsing per leverancier</p>
             <div className="space-y-3">
               {kostenPerCategorie.map((k, i) => (
-                <div key={k.name}>
+                <button
+                  key={k.name}
+                  onClick={() => setDetailCategorie({ naam: k.name, type: "kosten" })}
+                  className="w-full text-left hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors"
+                >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                     <span className="text-sm text-gray-600 flex-1 truncate" title={k.name}>{k.name}</span>
@@ -708,7 +713,7 @@ export default function AttivaCharts() {
                   <div className="ml-4 h-1 bg-gray-100 rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${(k.value / kostenPerCategorie[0].value) * 100}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -735,7 +740,7 @@ export default function AttivaCharts() {
                   return (
                     <button
                       key={c.name}
-                      onClick={() => setDetailCategorie(c.name)}
+                      onClick={() => setDetailCategorie({ naam: c.name, type: "omzet" })}
                       className="w-full text-left hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors"
                     >
                       <div className="flex items-center gap-2 mb-1">
@@ -837,10 +842,11 @@ export default function AttivaCharts() {
         />
       )}
 
-      {/* Omzet categorie detail modal */}
+      {/* Categorie detail modal (omzet of kosten) */}
       {detailCategorie && data.pl && (
-        <OmzetCategorieModal
-          categorie={detailCategorie}
+        <CategorieDetailModal
+          categorie={detailCategorie.naam}
+          type={detailCategorie.type}
           jaar={data.jaar}
           pl={data.pl}
           onClose={() => setDetailCategorie(null)}
@@ -989,25 +995,34 @@ function MaandDetailModal({
   );
 }
 
-// ─── Omzet per categorie modal ────────────────────────────────────────────────
-interface OmzetKlantRij { naam: string; totaal: number; perMaand: number[] }
-interface OmzetPerKlantResp {
+// ─── Categorie detail modal (werkt voor zowel omzet als kosten) ──────────────
+interface TegenpartijRij { naam: string; totaal: number; perMaand: number[] }
+interface TransactiesPerTegenpartijResp {
   jaar: number; categorie: string; totaal: number; aantalKlanten: number;
-  klanten: OmzetKlantRij[];
+  klanten: TegenpartijRij[];
 }
 
-function OmzetCategorieModal({
-  categorie, jaar, pl, onClose,
+function CategorieDetailModal({
+  categorie, type, jaar, pl, onClose,
 }: {
   categorie: string;
+  type: "omzet" | "kosten";
   jaar: number;
   pl: PlRow[];
   onClose: () => void;
 }) {
-  const [klantData, setKlantData] = useState<OmzetPerKlantResp | null>(null);
+  const [klantData, setKlantData] = useState<TransactiesPerTegenpartijResp | null>(null);
   const [klantLoading, setKlantLoading] = useState(true);
   const [klantError, setKlantError] = useState<string | null>(null);
   const [openKlant, setOpenKlant] = useState<string | null>(null);
+
+  // Type-afhankelijke labels & kleuren
+  const isKosten = type === "kosten";
+  const tegenpartijLabel = isKosten ? "leverancier" : "klant";
+  const tegenpartijLabelMv = isKosten ? "leveranciers" : "klanten";
+  const accentClass = isKosten ? "bg-gold-500" : "bg-navy-700";
+  const accentTextClass = isKosten ? "text-gold-600" : "text-navy-700";
+  const subtitleSuffix = isKosten ? "kostenuitsplitsing" : "omzetuitsplitsing";
 
   useEffect(() => {
     let cancelled = false;
@@ -1016,7 +1031,7 @@ function OmzetCategorieModal({
       setKlantError(null);
       try {
         const res = await fetch(
-          `/api/exact/omzet-per-klant?jaar=${jaar}&categorie=${encodeURIComponent(categorie)}`
+          `/api/exact/omzet-per-klant?jaar=${jaar}&categorie=${encodeURIComponent(categorie)}&type=${type}`
         );
         if (!res.ok) throw new Error(await res.text());
         const json = await res.json();
@@ -1029,7 +1044,7 @@ function OmzetCategorieModal({
     }
     load();
     return () => { cancelled = true; };
-  }, [categorie, jaar]);
+  }, [categorie, jaar, type]);
 
   // Filter alle rijen die bij deze categorie horen (zelfde Description, alleen omzet)
   const rijen = pl.filter(r => r.IsRevenue && r.Description === categorie);
@@ -1068,7 +1083,7 @@ function OmzetCategorieModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="min-w-0 pr-3">
             <h2 className="font-bold text-navy-700 text-lg truncate">{categorie}</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Maandelijkse omzetuitsplitsing — {jaar}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Maandelijkse {subtitleSuffix} — {jaar}</p>
           </div>
           <button
             onClick={onClose}
@@ -1109,7 +1124,7 @@ function OmzetCategorieModal({
                   <span className="text-xs text-gray-500 font-medium w-8 flex-shrink-0">{p.maand}</span>
                   <div className="flex-1 h-6 bg-gray-50 rounded-md relative overflow-hidden">
                     <div
-                      className={`h-full rounded-md transition-all ${isBeste ? "bg-emerald-500" : "bg-navy-700"}`}
+                      className={`h-full rounded-md transition-all ${isBeste ? "bg-emerald-500" : accentClass}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -1121,13 +1136,13 @@ function OmzetCategorieModal({
             })}
           </div>
 
-          {/* Per klant — uit bankboekingen / TransactionLines */}
+          {/* Per leverancier/klant — uit bankboekingen / TransactionLines */}
           <div className="mt-6 pt-5 border-t border-gray-100">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Per klant</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Per {tegenpartijLabel}</p>
               {klantData && (
                 <span className="text-[10px] text-gray-400">
-                  {klantData.aantalKlanten} klanten · {euroL(klantData.totaal)} totaal
+                  {klantData.aantalKlanten} {tegenpartijLabelMv} · {euroL(klantData.totaal)} totaal
                 </span>
               )}
             </div>
@@ -1135,19 +1150,19 @@ function OmzetCategorieModal({
             {klantLoading && (
               <div className="flex items-center justify-center gap-2 py-6 text-gray-400 text-sm">
                 <RefreshCw size={14} className="animate-spin" />
-                Klantgegevens ophalen uit Exact...
+                {tegenpartijLabelMv.charAt(0).toUpperCase() + tegenpartijLabelMv.slice(1)} ophalen uit Exact...
               </div>
             )}
 
             {klantError && (
               <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-700">
-                Kon klantgegevens niet laden: {klantError}
+                Kon {tegenpartijLabelMv} niet laden: {klantError}
               </div>
             )}
 
             {!klantLoading && !klantError && klantData && klantData.klanten.length === 0 && (
               <div className="bg-gray-50 rounded-xl px-4 py-6 text-sm text-gray-400 text-center">
-                Geen klantgegevens beschikbaar voor deze categorie.
+                Geen {tegenpartijLabelMv} gevonden voor deze categorie.
               </div>
             )}
 
@@ -1163,14 +1178,14 @@ function OmzetCategorieModal({
                         onClick={() => setOpenKlant(isOpen ? null : k.naam)}
                         className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 transition-colors text-left"
                       >
-                        <span className="w-5 h-5 rounded-full bg-navy-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                        <span className={`w-5 h-5 rounded-full ${accentClass} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>{i + 1}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="text-sm text-navy-700 font-medium truncate" title={k.naam}>{k.naam}</span>
-                            <span className="text-sm font-bold text-navy-700 flex-shrink-0">{euroL(k.totaal)}</span>
+                            <span className={`text-sm font-bold ${accentTextClass} flex-shrink-0`}>{euroL(k.totaal)}</span>
                           </div>
                           <div className="h-1 bg-white rounded-full overflow-hidden">
-                            <div className="h-full bg-navy-700 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                            <div className={`h-full ${accentClass} rounded-full transition-all`} style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                         <span className="text-gray-400 text-xs flex-shrink-0">{isOpen ? "▾" : "▸"}</span>
@@ -1182,14 +1197,18 @@ function OmzetCategorieModal({
                           <div className="grid grid-cols-6 gap-1.5">
                             {k.perMaand.map((bedrag, mi) => {
                               const heeftData = bedrag > 0;
+                              const cellBg = heeftData
+                                ? (isKosten ? "bg-gold-500/15" : "bg-navy-700/10")
+                                : "bg-gray-50";
+                              const cellText = heeftData ? accentTextClass : "text-gray-300";
                               return (
                                 <div
                                   key={mi}
-                                  className={`rounded p-1.5 text-center ${heeftData ? "bg-navy-700/10" : "bg-gray-50"}`}
-                                  title={`${MAANDEN[mi]} ${jaar}: ${heeftData ? euroL(bedrag) : "geen omzet"}`}
+                                  className={`rounded p-1.5 text-center ${cellBg}`}
+                                  title={`${MAANDEN[mi]} ${jaar}: ${heeftData ? euroL(bedrag) : (isKosten ? "geen kosten" : "geen omzet")}`}
                                 >
                                   <div className="text-[9px] font-bold text-gray-400 uppercase">{MAANDEN[mi]}</div>
-                                  <div className={`text-[10px] font-semibold ${heeftData ? "text-navy-700" : "text-gray-300"}`}>
+                                  <div className={`text-[10px] font-semibold ${cellText}`}>
                                     {heeftData ? `€${(bedrag / 1000).toFixed(bedrag >= 1000 ? 0 : 1)}K` : "—"}
                                   </div>
                                 </div>

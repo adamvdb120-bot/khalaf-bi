@@ -35,14 +35,18 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const jaar = parseInt(url.searchParams.get("jaar") ?? "0", 10);
   const categorie = url.searchParams.get("categorie") ?? "";
+  const type = (url.searchParams.get("type") ?? "omzet") as "omzet" | "kosten";
   const refresh = url.searchParams.get("refresh") === "1";
 
   if (!jaar || !categorie) {
     return NextResponse.json({ error: "jaar en categorie zijn verplicht" }, { status: 400 });
   }
+  if (type !== "omzet" && type !== "kosten") {
+    return NextResponse.json({ error: "type moet 'omzet' of 'kosten' zijn" }, { status: 400 });
+  }
 
   const admin = createAdminClient();
-  const cacheKey = `omzet-per-klant-${jaar}-${categorie}`;
+  const cacheKey = `transacties-per-tegenpartij-${type}-${jaar}-${categorie}`;
 
   // Cache check
   if (!refresh) {
@@ -85,10 +89,12 @@ export async function GET(req: Request) {
   const klantenMap: Record<string, KlantOmzet> = {};
 
   for (const line of lines) {
-    // Voor revenue accounts is AmountDC negatief in Exact (credit boeking).
-    // Toon als positief.
-    const bedrag = -Number(line.AmountDC ?? 0);
-    if (bedrag <= 0) continue; // sla credit-correcties / 0-regels over
+    // Sign-conventie Exact:
+    //  - Revenue accounts (omzet) → AmountDC is negatief (credit boeking) → negeren
+    //  - Cost accounts (kosten)   → AmountDC is positief (debit boeking)  → behouden
+    const raw = Number(line.AmountDC ?? 0);
+    const bedrag = type === "omzet" ? -raw : raw;
+    if (bedrag <= 0) continue; // sla correcties (andere kant op) en 0-regels over
 
     const periode = Number(line.FinancialPeriod ?? 0);
     if (periode < 1 || periode > 12) continue;
