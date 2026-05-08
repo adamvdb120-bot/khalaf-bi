@@ -101,6 +101,7 @@ export default function AttivaCharts() {
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
   const [autoFallback, setAutoFallback] = useState<number | null>(null);
   const [detailMaand, setDetailMaand] = useState<number | null>(null);
+  const [detailCategorie, setDetailCategorie] = useState<string | null>(null);
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -727,11 +728,16 @@ export default function AttivaCharts() {
                   {euro(omzetPerCategorie.reduce((s, c) => s + c.value, 0))} totaal
                 </span>
               </div>
+              <p className="text-xs text-gray-400 mb-3">Klik op een categorie voor maandelijkse uitsplitsing</p>
               <div className="space-y-3">
                 {omzetPerCategorie.map((c, i) => {
                   const max = omzetPerCategorie[0].value;
                   return (
-                    <div key={c.name}>
+                    <button
+                      key={c.name}
+                      onClick={() => setDetailCategorie(c.name)}
+                      className="w-full text-left hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors"
+                    >
                       <div className="flex items-center gap-2 mb-1">
                         <span className="w-5 h-5 rounded-full bg-navy-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                         <span className="text-sm text-navy-700 font-medium flex-1 truncate" title={c.name}>{c.name}</span>
@@ -740,7 +746,7 @@ export default function AttivaCharts() {
                       <div className="ml-7 h-1 bg-gray-100 rounded-full overflow-hidden">
                         <div className="h-full bg-navy-700 rounded-full transition-all" style={{ width: `${(c.value / max) * 100}%` }} />
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -828,6 +834,16 @@ export default function AttivaCharts() {
           jaar={data.jaar}
           pl={data.pl}
           onClose={() => setDetailMaand(null)}
+        />
+      )}
+
+      {/* Omzet categorie detail modal */}
+      {detailCategorie && data.pl && (
+        <OmzetCategorieModal
+          categorie={detailCategorie}
+          jaar={data.jaar}
+          pl={data.pl}
+          onClose={() => setDetailCategorie(null)}
         />
       )}
     </div>
@@ -967,6 +983,120 @@ function MaandDetailModal({
           {kostenRijen.length === 0 && omzetRijen.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-8">Geen detaildata beschikbaar voor deze maand.</p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Omzet per categorie modal ────────────────────────────────────────────────
+function OmzetCategorieModal({
+  categorie, jaar, pl, onClose,
+}: {
+  categorie: string;
+  jaar: number;
+  pl: PlRow[];
+  onClose: () => void;
+}) {
+  // Filter alle rijen die bij deze categorie horen (zelfde Description, alleen omzet)
+  const rijen = pl.filter(r => r.IsRevenue && r.Description === categorie);
+  const totaal = rijen.reduce((s, r) => s + r.Amount, 0);
+
+  // Per maand
+  const perMaand = MAANDEN.map((m, i) => {
+    const periode = i + 1;
+    const bedrag = rijen.filter(r => r.Period === periode).reduce((s, r) => s + r.Amount, 0);
+    return { maand: m, bedrag: Math.round(bedrag) };
+  });
+
+  const maxBedrag = Math.max(...perMaand.map(p => p.bedrag), 1);
+  const maandenMetData = perMaand.filter(p => p.bedrag !== 0);
+  const gemPerMaand = maandenMetData.length > 0 ? totaal / maandenMetData.length : 0;
+  const beste = maandenMetData.reduce((best, p) => p.bedrag > best.bedrag ? p : best, { maand: "—", bedrag: 0 });
+  const slechtste = maandenMetData.length > 0
+    ? maandenMetData.reduce((min, p) => p.bedrag < min.bedrag ? p : min, maandenMetData[0])
+    : { maand: "—", bedrag: 0 };
+
+  function euroL(v: number) {
+    return `€ ${Math.round(v).toLocaleString("nl-NL")}`;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="min-w-0 pr-3">
+            <h2 className="font-bold text-navy-700 text-lg truncate">{categorie}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Maandelijkse omzetuitsplitsing — {jaar}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors flex-shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* KPI row */}
+        <div className="grid grid-cols-3 gap-3 px-6 py-4 border-b border-gray-50">
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Totaal {jaar}</p>
+            <p className="text-base font-bold text-navy-700">{euroL(totaal)}</p>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Beste maand</p>
+            <p className="text-base font-bold text-emerald-600">{beste.maand}</p>
+            <p className="text-[10px] text-gray-400">{euroL(beste.bedrag)}</p>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Gemiddelde</p>
+            <p className="text-base font-bold text-navy-700">{euroL(gemPerMaand)}</p>
+            <p className="text-[10px] text-gray-400">per maand met data</p>
+          </div>
+        </div>
+
+        {/* Per maand bars */}
+        <div className="overflow-y-auto flex-1 px-6 py-5">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Per maand</p>
+          <div className="space-y-2.5">
+            {perMaand.map(p => {
+              const pct = maxBedrag > 0 ? (Math.abs(p.bedrag) / maxBedrag) * 100 : 0;
+              const isLeeg = p.bedrag === 0;
+              const isBeste = p.maand === beste.maand && p.bedrag > 0;
+              return (
+                <div key={p.maand} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 font-medium w-8 flex-shrink-0">{p.maand}</span>
+                  <div className="flex-1 h-6 bg-gray-50 rounded-md relative overflow-hidden">
+                    <div
+                      className={`h-full rounded-md transition-all ${isBeste ? "bg-emerald-500" : "bg-navy-700"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className={`text-xs font-semibold w-24 text-right flex-shrink-0 ${isLeeg ? "text-gray-300" : "text-navy-700"}`}>
+                    {isLeeg ? "—" : euroL(p.bedrag)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Per klant placeholder */}
+          <div className="mt-6 pt-5 border-t border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Per klant</p>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-800">
+              Klantgegevens komen niet uit de P&amp;L grootboeken. Voor uitsplitsing per klant moeten we
+              de bankboekingen of verkoopfacturen uit Exact ophalen — neem contact op als je dit wil
+              activeren.
+            </div>
+          </div>
         </div>
       </div>
     </div>
