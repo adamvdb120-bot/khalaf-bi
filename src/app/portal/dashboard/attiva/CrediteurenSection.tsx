@@ -177,17 +177,13 @@ export default function CrediteurenSection() {
 
   return (
     <div className="space-y-6">
-      {/* Filterbalk */}
+      {/* Filterbalk — geen jaar-pills want crediteuren is real-time peildatum */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-          {JAREN.map((j) => (
-            <button key={j} onClick={() => setJaar(j)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-              }`}>
-              {j}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-4 py-1.5">
+          <Clock size={13} className="text-gray-500" />
+          <span className="text-sm text-gray-600">
+            Peildatum: <strong className="text-navy-700">{new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}</strong>
+          </span>
         </div>
         <button onClick={() => load(jaar, true)}
           className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
