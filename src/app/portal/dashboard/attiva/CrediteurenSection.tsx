@@ -403,19 +403,40 @@ function CrediteurFacturenModal({
   facturen: RawFactuur[];
   onClose: () => void;
 }) {
+  const [jaarFilter, setJaarFilter] = useState<number | "alle">("alle");
+
   // Filter facturen voor deze crediteur — primair op AccountCode, fallback op naam
   const eigenFacturen = facturen.filter(f => {
     if (accountCode && f.AccountCode) return f.AccountCode === accountCode;
     return f.AccountName === crediteur;
   });
 
-  // Verrijk met dagen-open en sorteer urgent eerst
+  // Verrijk met dagen-open + factuurjaar
   const today = Date.now();
-  const verrijkt = eigenFacturen.map(f => {
+  const alleVerrijkt = eigenFacturen.map(f => {
     const dueMs = parseExactDate(f.DueDate ?? f.InvoiceDate ?? f.EntryDate);
+    const factuurMs = parseExactDate(f.InvoiceDate ?? f.EntryDate ?? f.DueDate);
     const daysOverdue = dueMs !== null ? Math.floor((today - dueMs) / 86400000) : 0;
-    return { ...f, daysOverdue };
-  }).sort((a, b) => b.daysOverdue - a.daysOverdue);
+    const jaar = factuurMs !== null ? new Date(factuurMs).getFullYear() : null;
+    return { ...f, daysOverdue, jaar };
+  });
+
+  // Beschikbare jaren (gesorteerd desc)
+  const beschikbareJaren = Array.from(
+    new Set(alleVerrijkt.map(f => f.jaar).filter((j): j is number => j !== null))
+  ).sort((a, b) => b - a);
+
+  // Tellingen per jaar voor pill-badges
+  const aantalPerJaar: Record<number, number> = {};
+  for (const f of alleVerrijkt) {
+    if (f.jaar !== null) aantalPerJaar[f.jaar] = (aantalPerJaar[f.jaar] ?? 0) + 1;
+  }
+
+  // Toepassen filter
+  const verrijkt = (jaarFilter === "alle"
+    ? alleVerrijkt
+    : alleVerrijkt.filter(f => f.jaar === jaarFilter)
+  ).sort((a, b) => b.daysOverdue - a.daysOverdue);
 
   const totaal = verrijkt.reduce((s, f) => s + Math.abs(f.Amount), 0);
   const aantal = verrijkt.length;
@@ -455,6 +476,34 @@ function CrediteurFacturenModal({
             ✕
           </button>
         </div>
+
+        {/* Jaar-filter pills (alleen tonen als facturen uit meerdere jaren komen) */}
+        {beschikbareJaren.length > 1 && (
+          <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-50 bg-gray-50/50">
+            <span className="text-xs text-gray-400 font-medium">Filter:</span>
+            <div className="flex gap-1 bg-white rounded-lg p-1 border border-gray-200">
+              <button
+                onClick={() => setJaarFilter("alle")}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                  jaarFilter === "alle" ? "bg-navy-700 text-white" : "text-gray-500 hover:text-navy-700"
+                }`}
+              >
+                Alle ({alleVerrijkt.length})
+              </button>
+              {beschikbareJaren.map((j) => (
+                <button
+                  key={j}
+                  onClick={() => setJaarFilter(j)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                    jaarFilter === j ? "bg-navy-700 text-white" : "text-gray-500 hover:text-navy-700"
+                  }`}
+                >
+                  {j} ({aantalPerJaar[j]})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* KPI row */}
         <div className="grid grid-cols-3 gap-3 px-6 py-4 border-b border-gray-50">
@@ -506,7 +555,14 @@ function CrediteurFacturenModal({
                   return (
                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60">
                       <td className="py-2.5 font-medium text-navy-700">
-                        {f.InvoiceNumber || f.YourRef || "—"}
+                        <div className="flex items-center gap-2">
+                          <span>{f.InvoiceNumber || f.YourRef || "—"}</span>
+                          {f.jaar !== null && (
+                            <span className="text-[9px] font-semibold bg-navy-700/10 text-navy-700 px-1.5 py-0.5 rounded">
+                              {f.jaar}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 text-gray-600 truncate max-w-[200px]" title={f.Description}>
                         {f.Description || "—"}
