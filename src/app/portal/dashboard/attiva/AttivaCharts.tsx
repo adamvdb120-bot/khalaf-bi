@@ -990,6 +990,12 @@ function MaandDetailModal({
 }
 
 // ─── Omzet per categorie modal ────────────────────────────────────────────────
+interface OmzetKlantRij { naam: string; totaal: number; perMaand: number[] }
+interface OmzetPerKlantResp {
+  jaar: number; categorie: string; totaal: number; aantalKlanten: number;
+  klanten: OmzetKlantRij[];
+}
+
 function OmzetCategorieModal({
   categorie, jaar, pl, onClose,
 }: {
@@ -998,6 +1004,33 @@ function OmzetCategorieModal({
   pl: PlRow[];
   onClose: () => void;
 }) {
+  const [klantData, setKlantData] = useState<OmzetPerKlantResp | null>(null);
+  const [klantLoading, setKlantLoading] = useState(true);
+  const [klantError, setKlantError] = useState<string | null>(null);
+  const [openKlant, setOpenKlant] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setKlantLoading(true);
+      setKlantError(null);
+      try {
+        const res = await fetch(
+          `/api/exact/omzet-per-klant?jaar=${jaar}&categorie=${encodeURIComponent(categorie)}`
+        );
+        if (!res.ok) throw new Error(await res.text());
+        const json = await res.json();
+        if (!cancelled) setKlantData(json);
+      } catch (e) {
+        if (!cancelled) setKlantError(e instanceof Error ? e.message : "Onbekende fout");
+      } finally {
+        if (!cancelled) setKlantLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [categorie, jaar]);
+
   // Filter alle rijen die bij deze categorie horen (zelfde Description, alleen omzet)
   const rijen = pl.filter(r => r.IsRevenue && r.Description === categorie);
   const totaal = rijen.reduce((s, r) => s + r.Amount, 0);
@@ -1088,14 +1121,88 @@ function OmzetCategorieModal({
             })}
           </div>
 
-          {/* Per klant placeholder */}
+          {/* Per klant — uit bankboekingen / TransactionLines */}
           <div className="mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Per klant</p>
-            <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-800">
-              Klantgegevens komen niet uit de P&amp;L grootboeken. Voor uitsplitsing per klant moeten we
-              de bankboekingen of verkoopfacturen uit Exact ophalen — neem contact op als je dit wil
-              activeren.
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Per klant</p>
+              {klantData && (
+                <span className="text-[10px] text-gray-400">
+                  {klantData.aantalKlanten} klanten · {euroL(klantData.totaal)} totaal
+                </span>
+              )}
             </div>
+
+            {klantLoading && (
+              <div className="flex items-center justify-center gap-2 py-6 text-gray-400 text-sm">
+                <RefreshCw size={14} className="animate-spin" />
+                Klantgegevens ophalen uit Exact...
+              </div>
+            )}
+
+            {klantError && (
+              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-700">
+                Kon klantgegevens niet laden: {klantError}
+              </div>
+            )}
+
+            {!klantLoading && !klantError && klantData && klantData.klanten.length === 0 && (
+              <div className="bg-gray-50 rounded-xl px-4 py-6 text-sm text-gray-400 text-center">
+                Geen klantgegevens beschikbaar voor deze categorie.
+              </div>
+            )}
+
+            {!klantLoading && !klantError && klantData && klantData.klanten.length > 0 && (
+              <div className="space-y-1.5">
+                {klantData.klanten.map((k, i) => {
+                  const isOpen = openKlant === k.naam;
+                  const max = klantData.klanten[0].totaal;
+                  const pct = max > 0 ? (k.totaal / max) * 100 : 0;
+                  return (
+                    <div key={k.naam} className="bg-gray-50 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setOpenKlant(isOpen ? null : k.naam)}
+                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 transition-colors text-left"
+                      >
+                        <span className="w-5 h-5 rounded-full bg-navy-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-sm text-navy-700 font-medium truncate" title={k.naam}>{k.naam}</span>
+                            <span className="text-sm font-bold text-navy-700 flex-shrink-0">{euroL(k.totaal)}</span>
+                          </div>
+                          <div className="h-1 bg-white rounded-full overflow-hidden">
+                            <div className="h-full bg-navy-700 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                        <span className="text-gray-400 text-xs flex-shrink-0">{isOpen ? "▾" : "▸"}</span>
+                      </button>
+
+                      {isOpen && (
+                        <div className="px-3 py-3 bg-white border-t border-gray-100">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Per maand</p>
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {k.perMaand.map((bedrag, mi) => {
+                              const heeftData = bedrag > 0;
+                              return (
+                                <div
+                                  key={mi}
+                                  className={`rounded p-1.5 text-center ${heeftData ? "bg-navy-700/10" : "bg-gray-50"}`}
+                                  title={`${MAANDEN[mi]} ${jaar}: ${heeftData ? euroL(bedrag) : "geen omzet"}`}
+                                >
+                                  <div className="text-[9px] font-bold text-gray-400 uppercase">{MAANDEN[mi]}</div>
+                                  <div className={`text-[10px] font-semibold ${heeftData ? "text-navy-700" : "text-gray-300"}`}>
+                                    {heeftData ? `€${(bedrag / 1000).toFixed(bedrag >= 1000 ? 0 : 1)}K` : "—"}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
