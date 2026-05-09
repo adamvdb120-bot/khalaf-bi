@@ -15,14 +15,18 @@ export async function GET() {
   }
 
   const admin = createAdminClient();
-  const { data: row } = await admin
+  const { data: row, error: dbError } = await admin
     .from("exact_tokens")
-    .select("client_name, division, expires_at, updated_at")
+    .select("client_name, division, expires_at, created_at")
     .eq("client_name", "attiva")
     .single();
 
-  if (!row) {
-    return NextResponse.json({ connected: false, client_name: "attiva" });
+  if (dbError || !row) {
+    return NextResponse.json({
+      connected: false,
+      client_name: "attiva",
+      debug: dbError?.message,
+    });
   }
 
   const expiresAtMs = new Date(row.expires_at).getTime();
@@ -35,7 +39,9 @@ export async function GET() {
     division: row.division,
     expires_at: row.expires_at,
     minutes_until_expiry: minutesUntilExpiry,
-    updated_at: row.updated_at,
+    created_at: row.created_at,
+    // Refresh tokens van Exact zijn meestal 30 dagen geldig.
+    // Access token vervalt na ~10 min, maar wordt automatisch ververst.
     is_expired: minutesUntilExpiry < 0,
     is_expiring_soon: minutesUntilExpiry < 5,
   });

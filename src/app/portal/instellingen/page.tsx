@@ -20,7 +20,7 @@ interface ExactStatus {
   minutes_until_expiry?: number;
   is_expired?: boolean;
   is_expiring_soon?: boolean;
-  updated_at?: string;
+  created_at?: string;
   division?: number;
 }
 
@@ -273,22 +273,10 @@ export default function InstellingenPage() {
               </a>
             </div>
           ) : (
-            <div className={`rounded-xl p-4 border space-y-3 ${
-              exactStatus.is_expired ? "bg-red-50 border-red-100"
-              : exactStatus.is_expiring_soon ? "bg-amber-50 border-amber-100"
-              : "bg-emerald-50 border-emerald-100"
-            }`}>
+            <div className="rounded-xl p-4 border bg-emerald-50 border-emerald-100 space-y-3">
               <div className="flex items-center gap-2">
-                {exactStatus.is_expired ? (
-                  <><AlertCircle size={16} className="text-red-500" />
-                  <span className="text-sm font-semibold text-red-700">Token verlopen</span></>
-                ) : exactStatus.is_expiring_soon ? (
-                  <><AlertCircle size={16} className="text-amber-500" />
-                  <span className="text-sm font-semibold text-amber-800">Token verloopt zo</span></>
-                ) : (
-                  <><CheckCircle2 size={16} className="text-emerald-500" />
-                  <span className="text-sm font-semibold text-emerald-700">Verbonden met Exact Online</span></>
-                )}
+                <CheckCircle2 size={16} className="text-emerald-500" />
+                <span className="text-sm font-semibold text-emerald-700">Verbonden met Exact Online</span>
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
@@ -296,14 +284,18 @@ export default function InstellingenPage() {
                   <p className="font-semibold text-navy-700">{exactStatus.division}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Token vervalt over</p>
+                  <p className="text-gray-500">Gekoppeld op</p>
                   <p className="font-semibold text-navy-700">
-                    {exactStatus.is_expired
-                      ? "verlopen"
-                      : `${exactStatus.minutes_until_expiry} min`}
+                    {exactStatus.created_at
+                      ? new Date(exactStatus.created_at).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
+                      : "—"}
                   </p>
                 </div>
               </div>
+              <p className="text-[11px] text-emerald-700/70 leading-relaxed">
+                Toegangstokens worden automatisch ververst. Als je toch problemen hebt met data
+                ophalen, klik dan op &quot;Opnieuw koppelen&quot;.
+              </p>
               <div className="pt-2 border-t border-white/40">
                 <a href="/api/exact/auth"
                   className="inline-flex items-center gap-2 text-xs text-navy-700 hover:text-navy-600 font-semibold">
