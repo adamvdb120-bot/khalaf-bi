@@ -91,7 +91,9 @@ function AgedBar({ d }: { d: Debiteur }) {
   );
 }
 
-export default function AttivaCharts() {
+type NavigateFn = (tab: "financieel" | "cashflow" | "crediteuren" | "declaraties", sectionId?: string) => void;
+
+export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn } = {}) {
   const [data, setData] = useState<ExactData | null>(null);
   const [vorigData, setVorigData] = useState<ExactData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -430,7 +432,7 @@ export default function AttivaCharts() {
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
       {/* Smart Insights — AI-driven samenvatting */}
-      {maandData.length > 0 && <AutoInsights jaar={data.jaar} />}
+      {maandData.length > 0 && <AutoInsights jaar={data.jaar} onNavigate={onNavigate} />}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-5">
@@ -559,7 +561,7 @@ export default function AttivaCharts() {
 
       {/* Omzet vs Kosten */}
       {maandData.length > 0 && (
-        <div className="card">
+        <div className="card" id="sectie-omzet-kosten">
           <h3 className="font-bold text-navy-700 mb-5">Omzet vs Kosten per maand — {data.jaar}</h3>
           <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
             <span className="inline-block w-3 h-3 rounded-full bg-gold-500/60" />
@@ -607,7 +609,7 @@ export default function AttivaCharts() {
 
       {/* Nettoresultaat trend */}
       {maandData.length > 0 && (
-        <div className="card">
+        <div className="card" id="sectie-marge">
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-bold text-navy-700">Nettoresultaat per maand — {data.jaar}</h3>
             {toonPrognose && !maand && (
@@ -685,7 +687,7 @@ export default function AttivaCharts() {
 
       {/* Kostenuitsplitsing */}
       {kostenPerCategorie.length > 0 && (
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-2 gap-5" id="sectie-kosten">
           <div className="card">
             <h3 className="font-bold text-navy-700 mb-4">
               Kostenuitsplitsing {maand ? `${maand} ${data.jaar}` : data.jaar}
@@ -726,7 +728,7 @@ export default function AttivaCharts() {
 
       {/* Debiteuren (of Omzet per categorie als debiteuren leeg) & Crediteuren */}
       {(topDebiteuren.length > 0 || topCrediteuren.length > 0 || omzetPerCategorie.length > 0) && (
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-2 gap-5" id="sectie-omzet-categorie">
           {topDebiteuren.length === 0 && omzetPerCategorie.length > 0 && (
             <div className="card">
               <div className="flex items-center justify-between mb-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BarChart2, FileText, TrendingUp, Wallet } from "lucide-react";
 import AttivaCharts from "./AttivaCharts";
 import DeclaratiesSection from "./DeclaratiesSection";
@@ -14,8 +14,30 @@ const TABS = [
   { id: "declaraties", label: "Declaratieoverzicht", icon: FileText },
 ];
 
+export type AttivaTabId = "financieel" | "cashflow" | "crediteuren" | "declaraties";
+
 export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
-  const [active, setActive] = useState("financieel");
+  const [active, setActive] = useState<AttivaTabId>("financieel");
+  const [scrollTarget, setScrollTarget] = useState<string | null>(null);
+
+  // Cross-tab navigatie + smooth scroll naar sectie binnen de tab
+  function navigate(tab: AttivaTabId, sectionId?: string) {
+    setActive(tab);
+    if (sectionId) {
+      setScrollTarget(sectionId);
+    }
+  }
+
+  useEffect(() => {
+    if (!scrollTarget) return;
+    // Wacht op render van nieuwe tab-content
+    const timer = setTimeout(() => {
+      const el = document.getElementById(scrollTarget);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      setScrollTarget(null);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [active, scrollTarget]);
 
   return (
     <div className="space-y-6">
@@ -24,7 +46,7 @@ export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
         {TABS.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActive(tab.id)}
+            onClick={() => setActive(tab.id as AttivaTabId)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
               active === tab.id
                 ? "bg-white text-navy-700 shadow-sm"
@@ -39,7 +61,7 @@ export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
 
       {/* Tab content */}
       {active === "financieel" && (
-        isConnected ? <AttivaCharts /> : (
+        isConnected ? <AttivaCharts onNavigate={navigate} /> : (
           <div className="card text-center py-20 space-y-6">
             <div className="w-16 h-16 bg-navy-700/5 rounded-2xl flex items-center justify-center mx-auto">
               <BarChart2 size={28} className="text-navy-700" />

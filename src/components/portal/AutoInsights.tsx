@@ -20,6 +20,30 @@ interface InsightResponse {
   age_seconds?: number;
 }
 
+type AttivaTabId = "financieel" | "cashflow" | "crediteuren" | "declaraties";
+type NavigateFn = (tab: AttivaTabId, sectionId?: string) => void;
+
+// Map insight-type → waar de gebruiker waarschijnlijk heen wil
+function navigationTarget(insight: Insight): { tab: AttivaTabId; section?: string } | null {
+  switch (insight.type) {
+    case "crediteur":
+      return { tab: "crediteuren" };
+    case "concentratie":
+    case "groei":
+      return { tab: "financieel", section: "sectie-omzet-categorie" };
+    case "marge":
+      return { tab: "financieel", section: "sectie-marge" };
+    case "trend":
+    case "anomalie":
+      return { tab: "financieel", section: "sectie-omzet-kosten" };
+    case "actie":
+      // Vaak gerelateerd aan crediteuren in de huidige Attiva-data
+      return { tab: "crediteuren" };
+    default:
+      return null;
+  }
+}
+
 const SEVERITY_STYLES = {
   alarm: {
     bg: "bg-red-50",
@@ -77,7 +101,7 @@ const TYPE_ICONS = {
   actie: ArrowUpRight,
 };
 
-export default function AutoInsights({ jaar }: { jaar: number }) {
+export default function AutoInsights({ jaar, onNavigate }: { jaar: number; onNavigate?: NavigateFn }) {
   const [data, setData] = useState<InsightResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -149,11 +173,11 @@ export default function AutoInsights({ jaar }: { jaar: number }) {
               const TypeIcon = TYPE_ICONS[ins.type] ?? Info;
               const SeverityIcon = s.icon;
 
-              return (
-                <div
-                  key={i}
-                  className={`${s.bg} ${s.border} border rounded-xl p-4 flex flex-col gap-2.5 hover:shadow-sm transition-shadow`}
-                >
+              const target = navigationTarget(ins);
+              const clickable = !!(onNavigate && target);
+
+              const cardContent = (
+                <>
                   <div className="flex items-start justify-between gap-2">
                     <div className={`w-9 h-9 rounded-xl ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
                       <TypeIcon size={16} className={s.iconColor} />
@@ -178,6 +202,36 @@ export default function AutoInsights({ jaar }: { jaar: number }) {
                   <p className="text-xs text-gray-700 leading-relaxed">
                     {ins.beschrijving}
                   </p>
+
+                  {clickable && (
+                    <div className="mt-auto pt-2 flex items-center justify-end">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest ${s.iconColor} group-hover:gap-2 transition-all`}>
+                        Bekijk details
+                        <ArrowUpRight size={11} />
+                      </span>
+                    </div>
+                  )}
+                </>
+              );
+
+              if (clickable && target) {
+                return (
+                  <button
+                    key={i}
+                    onClick={() => onNavigate!(target.tab, target.section)}
+                    className={`group ${s.bg} ${s.border} border rounded-xl p-4 flex flex-col gap-2.5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer`}
+                  >
+                    {cardContent}
+                  </button>
+                );
+              }
+
+              return (
+                <div
+                  key={i}
+                  className={`${s.bg} ${s.border} border rounded-xl p-4 flex flex-col gap-2.5 hover:shadow-sm transition-shadow`}
+                >
+                  {cardContent}
                 </div>
               );
             })}
