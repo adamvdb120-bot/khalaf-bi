@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, Euro, AlertCircle, RefreshCw, ArrowUpRight, A
 import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
+import AutoInsights from "@/components/portal/AutoInsights";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface Debiteur { Name: string; Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number }
@@ -428,6 +429,9 @@ export default function AttivaCharts() {
       )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
+      {/* Smart Insights — AI-driven samenvatting */}
+      {maandData.length > 0 && <AutoInsights jaar={data.jaar} />}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-5">
         {/* Omzet */}
