@@ -12,6 +12,7 @@ import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 import AutoInsights from "@/components/portal/AutoInsights";
 import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
+import { CacheBadge } from "@/components/portal/CacheBadge";
 import { Presentation } from "lucide-react";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
@@ -110,6 +111,8 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
   const [detailCategorie, setDetailCategorie] = useState<{ naam: string; type: "omzet" | "kosten" } | null>(null);
   const [showPresentation, setShowPresentation] = useState(false);
   const [insightsForPresentation, setInsightsForPresentation] = useState<Array<{ titel: string; beschrijving: string; severity: "alarm" | "attention" | "positive" | "info"; type: string; cijfer?: string }>>([]);
+  const [cacheStatus, setCacheStatus] = useState<"HIT" | "MISS" | null>(null);
+  const [cacheAge, setCacheAge] = useState<number | null>(null);
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -118,6 +121,13 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
     try {
       const res = await fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`);
       if (!res.ok) throw new Error(await res.text());
+
+      // Cache-status uit headers
+      const cacheHdr = res.headers.get("X-Cache");
+      const cacheAgeHdr = res.headers.get("X-Cache-Age");
+      setCacheStatus(cacheHdr === "HIT" || cacheHdr === "MISS" ? cacheHdr : null);
+      setCacheAge(cacheAgeHdr ? parseInt(cacheAgeHdr, 10) : null);
+
       const json = await res.json();
       const huidig = json.huidig ?? json;
       const heeftData = huidig?.pl && huidig.pl.length > 0;
@@ -182,18 +192,65 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
   if (loading) return (
     <div className="space-y-6">
       {jaarSelector}
+
+      {/* Smart Insights skeleton */}
+      <div className="card relative overflow-hidden">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-gray-100 animate-pulse" />
+            <div className="space-y-1.5">
+              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+              <div className="h-2 w-32 bg-gray-100 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[0,1,2].map(i => (
+            <div key={i} className="bg-gray-50 rounded-xl p-4 space-y-3 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+              <div className="flex items-start justify-between">
+                <div className="w-9 h-9 rounded-xl bg-gray-200" />
+                <div className="h-5 bg-gray-200 rounded-full w-20" />
+              </div>
+              <div className="h-4 bg-gray-200 rounded w-3/4" />
+              <div className="h-7 bg-gray-200 rounded w-1/3" />
+              <div className="h-3 bg-gray-200 rounded w-full" />
+              <div className="h-3 bg-gray-200 rounded w-5/6" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI cards skeleton */}
       <div className="grid grid-cols-3 gap-5">
         {[0,1,2].map(i => (
-          <div key={i} className="card animate-pulse">
-            <div className="h-4 bg-gray-100 rounded w-1/2 mb-4" />
-            <div className="h-8 bg-gray-100 rounded w-3/4 mb-2" />
-            <div className="h-3 bg-gray-100 rounded w-1/3" />
+          <div key={i} className="card animate-pulse" style={{ animationDelay: `${i * 80}ms` }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-9 h-9 rounded-xl bg-gray-100" />
+              <div className="h-5 w-14 bg-gray-100 rounded-full" />
+            </div>
+            <div className="h-3 w-24 bg-gray-100 rounded mb-2" />
+            <div className="h-7 w-32 bg-gray-100 rounded mb-1.5" />
+            <div className="h-2.5 w-20 bg-gray-100 rounded" />
           </div>
         ))}
       </div>
-      <div className="card animate-pulse h-72 flex items-center justify-center gap-3 text-gray-300">
-        <RefreshCw size={20} className="animate-spin" />
-        <span className="text-sm">Exact Online data ophalen...</span>
+
+      {/* Chart skeleton */}
+      <div className="card animate-pulse">
+        <div className="h-4 w-48 bg-gray-100 rounded mb-5" />
+        <div className="flex items-end gap-2 h-56">
+          {[35, 58, 42, 72, 50, 85, 64, 78, 55, 90, 70, 95].map((h, i) => (
+            <div key={i} className="flex-1 flex flex-col gap-1 justify-end items-center">
+              <div className="w-full bg-gray-200 rounded-t" style={{ height: `${h}%` }} />
+              <div className="w-full bg-gray-100 rounded-t" style={{ height: `${h * 0.7}%` }} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center gap-2 text-gray-400 text-xs">
+        <RefreshCw size={12} className="animate-spin" />
+        <span>Live data ophalen uit Exact Online…</span>
       </div>
     </div>
   );
@@ -405,6 +462,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         </div>
         {/* Rechts: timestamp + knoppen */}
         <div className="flex items-center gap-3">
+          <CacheBadge cacheStatus={cacheStatus} ageSeconds={cacheAge} />
           {lastUpdated && (
             <span className="text-xs text-gray-400">
               Bijgewerkt om {lastUpdated.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
