@@ -101,7 +101,13 @@ const TYPE_ICONS = {
   actie: ArrowUpRight,
 };
 
-export default function AutoInsights({ jaar, onNavigate }: { jaar: number; onNavigate?: NavigateFn }) {
+export default function AutoInsights({
+  jaar, onNavigate, onInsightsLoaded,
+}: {
+  jaar: number;
+  onNavigate?: NavigateFn;
+  onInsightsLoaded?: (insights: Insight[]) => void;
+}) {
   const [data, setData] = useState<InsightResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +121,7 @@ export default function AutoInsights({ jaar, onNavigate }: { jaar: number; onNav
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
       setData(json);
+      if (onInsightsLoaded && json.insights) onInsightsLoaded(json.insights);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Onbekende fout");
     } finally {

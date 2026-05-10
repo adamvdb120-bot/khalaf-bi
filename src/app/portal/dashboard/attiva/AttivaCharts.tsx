@@ -10,6 +10,8 @@ import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 import AutoInsights from "@/components/portal/AutoInsights";
+import PresentationMode from "@/components/portal/PresentationMode";
+import { Presentation } from "lucide-react";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface Debiteur { Name: string; Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number }
@@ -105,6 +107,8 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
   const [autoFallback, setAutoFallback] = useState<number | null>(null);
   const [detailMaand, setDetailMaand] = useState<number | null>(null);
   const [detailCategorie, setDetailCategorie] = useState<{ naam: string; type: "omzet" | "kosten" } | null>(null);
+  const [showPresentation, setShowPresentation] = useState(false);
+  const [insightsForPresentation, setInsightsForPresentation] = useState<Array<{ titel: string; beschrijving: string; severity: "alarm" | "attention" | "positive" | "info"; type: string; cijfer?: string }>>([]);
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -409,6 +413,11 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
             <RefreshCw size={12} /> Vernieuwen
           </button>
+          <button onClick={() => setShowPresentation(true)}
+            disabled={maandData.length === 0}
+            className="flex items-center gap-1.5 text-xs bg-navy-700 hover:bg-navy-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg px-3 py-1.5 transition-colors">
+            <Presentation size={12} /> Presentatie
+          </button>
           <DownloadPDFButton
             targetId="attiva-financieel-export"
             filename={`Attiva-Zorg-Financieel-${jaar}`}
@@ -432,7 +441,13 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
       {/* Smart Insights — AI-driven samenvatting */}
-      {maandData.length > 0 && <AutoInsights jaar={data.jaar} onNavigate={onNavigate} />}
+      {maandData.length > 0 && (
+        <AutoInsights
+          jaar={data.jaar}
+          onNavigate={onNavigate}
+          onInsightsLoaded={setInsightsForPresentation}
+        />
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-5">
@@ -836,6 +851,29 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
             onChartPinned={() => setPinnedRefresh(r => r + 1)}
           />
         </>
+      )}
+
+      {/* Presentation mode */}
+      {showPresentation && (
+        <PresentationMode
+          data={{
+            klantNaam: "Attiva Zorg",
+            jaar: data.jaar,
+            totaalOmzet,
+            totaalKosten,
+            totaalMarge,
+            margePct: margePercent,
+            vorigOmzet,
+            maandData,
+            topKosten: kostenPerCategorie,
+            topOmzet: omzetPerCategorie,
+            insights: insightsForPresentation,
+            topCrediteuren: topCrediteuren.map(c => ({ Name: c.Name, totaal: c.totaal, Age90Plus: c.Age90Plus ?? 0 })),
+            totaalCrediteuren: topCrediteuren.reduce((s, c) => s + c.totaal, 0),
+            totaal90Plus: topCrediteuren.reduce((s, c) => s + (c.Age90Plus ?? 0), 0),
+          }}
+          onClose={() => setShowPresentation(false)}
+        />
       )}
 
       {/* Maand detail modal */}
