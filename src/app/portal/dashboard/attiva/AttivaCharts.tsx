@@ -11,6 +11,7 @@ import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 import AutoInsights from "@/components/portal/AutoInsights";
 import PresentationMode from "@/components/portal/PresentationMode";
+import ExportButton from "@/components/portal/ExportButton";
 import { Presentation } from "lucide-react";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
@@ -946,12 +947,34 @@ function MaandDetailModal({
             <h2 className="font-bold text-navy-700 text-lg">{maandNaam} {jaar}</h2>
             <p className="text-xs text-gray-400 mt-0.5">W&V uitsplitsing per grootboekrekening</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              filename={`Attiva-WV-${maandNaam}-${jaar}`}
+              sheetName={`${maandNaam} ${jaar}`}
+              rows={[
+                ...omzetRijen.map(r => ({
+                  Type: "Omzet",
+                  Grootboekrekening: r.Description,
+                  Bedrag: r.Amount,
+                  Periode: maandNaam,
+                  Jaar: jaar,
+                })),
+                ...kostenRijen.map(r => ({
+                  Type: "Kosten",
+                  Grootboekrekening: r.Description,
+                  Bedrag: r.Amount,
+                  Periode: maandNaam,
+                  Jaar: jaar,
+                })),
+              ]}
+            />
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* KPI row */}
@@ -1133,12 +1156,39 @@ function CategorieDetailModal({
             <h2 className="font-bold text-navy-700 text-lg truncate">{categorie}</h2>
             <p className="text-xs text-gray-400 mt-0.5">Maandelijkse {subtitleSuffix} — {jaar}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors flex-shrink-0"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <ExportButton
+              filename={`Attiva-${type}-${categorie.replace(/[^a-zA-Z0-9-]/g, "_")}-${jaar}`}
+              sheetName={categorie.slice(0, 28)}
+              disabled={!klantData || klantData.klanten.length === 0}
+              rows={
+                klantData
+                  ? klantData.klanten.flatMap(k => [
+                      {
+                        [tegenpartijLabel === "leverancier" ? "Leverancier" : "Klant"]: k.naam,
+                        Categorie: categorie,
+                        Periode: "Totaal",
+                        Bedrag: k.totaal,
+                        Jaar: jaar,
+                      },
+                      ...k.perMaand.map((bedrag, mi) => ({
+                        [tegenpartijLabel === "leverancier" ? "Leverancier" : "Klant"]: k.naam,
+                        Categorie: categorie,
+                        Periode: MAANDEN[mi],
+                        Bedrag: bedrag,
+                        Jaar: jaar,
+                      })).filter(r => r.Bedrag !== 0),
+                    ])
+                  : []
+              }
+            />
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* KPI row */}

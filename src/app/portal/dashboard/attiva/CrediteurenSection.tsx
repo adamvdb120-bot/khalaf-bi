@@ -8,6 +8,7 @@ import {
 import { RefreshCw, AlertCircle, AlertTriangle, Wallet, Users, Clock } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
+import ExportButton from "@/components/portal/ExportButton";
 
 interface Crediteur {
   Name: string;
@@ -304,6 +305,19 @@ export default function CrediteurenSection() {
           <div className="card">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold text-navy-700">Alle crediteuren ({crediteuren.length})</h3>
+              <ExportButton
+                filename={`Attiva-Crediteuren-${new Date().toISOString().slice(0, 10)}`}
+                sheetName="Crediteuren"
+                rows={crediteuren.map((c) => ({
+                  Crediteur: c.Name,
+                  "0-30 dagen": c.Age0to30 ?? 0,
+                  "31-60 dagen": c.Age31to60 ?? 0,
+                  "61-90 dagen": c.Age61to90 ?? 0,
+                  "Meer dan 90 dagen": c.Age90Plus ?? 0,
+                  Totaal: c.totaal,
+                  Urgent: (c.Age90Plus ?? 0) > 0 ? "Ja" : "Nee",
+                }))}
+              />
             </div>
             <p className="text-xs text-gray-400 mb-3">Klik op een crediteur voor de openstaande facturen</p>
             <div className="overflow-x-auto">
@@ -469,12 +483,30 @@ function CrediteurFacturenModal({
               {accountCode && <> · code {accountCode}</>}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors flex-shrink-0"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <ExportButton
+              filename={`Attiva-Facturen-${crediteur.replace(/[^a-zA-Z0-9-]/g, "_")}`}
+              sheetName={crediteur.slice(0, 28)}
+              disabled={verrijkt.length === 0}
+              rows={verrijkt.map(f => ({
+                Factuurnummer: f.InvoiceNumber ?? "",
+                Omschrijving: f.Description ?? "",
+                Factuurdatum: fmtDate(f.InvoiceDate),
+                Vervaldatum: fmtDate(f.DueDate),
+                "Dagen open": f.daysOverdue,
+                Bedrag: Math.abs(f.Amount),
+                Jaar: f.jaar ?? "",
+                Crediteur: crediteur,
+                Status: f.daysOverdue > 90 ? ">90 dagen" : f.daysOverdue > 60 ? "61-90 dagen" : f.daysOverdue > 30 ? "31-60 dagen" : "0-30 dagen",
+              }))}
+            />
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Jaar-filter pills (alleen tonen als facturen uit meerdere jaren komen) */}
