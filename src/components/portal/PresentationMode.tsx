@@ -58,13 +58,16 @@ const SEVERITY_ICON = {
   info: Info,
 };
 
+type AttivaTabId = "financieel" | "cashflow" | "crediteuren" | "declaraties";
+
 export default function PresentationMode({
-  data, onClose, onCategorieClick, onMaandClick,
+  data, onClose, onCategorieClick, onMaandClick, onNavigate,
 }: {
   data: PresentationData;
   onClose: () => void;
   onCategorieClick?: (naam: string, type: "omzet" | "kosten") => void;
   onMaandClick?: (periode: number) => void;
+  onNavigate?: (tab: AttivaTabId, sectionId?: string) => void;
 }) {
   const [slide, setSlide] = useState(0);
 
@@ -73,6 +76,7 @@ export default function PresentationMode({
     "insights",
     "kpi",
     "omzetkosten",
+    "omzet",
     "kosten",
     "crediteuren",
   ] as const;
@@ -134,11 +138,22 @@ export default function PresentationMode({
       <div className="flex-1 overflow-auto px-8 lg:px-16 py-8 flex items-center justify-center">
         <div className="w-full max-w-7xl mx-auto">
           {current === "title" && <SlideTitle data={data} />}
-          {current === "insights" && <SlideInsights data={data} />}
+          {current === "insights" && (
+            <SlideInsights
+              data={data}
+              onInsightClick={onNavigate ? (tab, sect) => { onClose(); onNavigate(tab, sect); } : undefined}
+            />
+          )}
           {current === "kpi" && <SlideKpi data={data} />}
           {current === "omzetkosten" && <SlideOmzetKosten data={data} onMaandClick={onMaandClick} />}
+          {current === "omzet" && <SlideOmzet data={data} onCategorieClick={onCategorieClick} />}
           {current === "kosten" && <SlideKosten data={data} onCategorieClick={onCategorieClick} />}
-          {current === "crediteuren" && <SlideCrediteuren data={data} />}
+          {current === "crediteuren" && (
+            <SlideCrediteuren
+              data={data}
+              onCrediteurClick={onNavigate ? () => { onClose(); onNavigate("crediteuren"); } : undefined}
+            />
+          )}
         </div>
       </div>
 
@@ -208,7 +223,30 @@ function SlideTitle({ data }: { data: PresentationData }) {
   );
 }
 
-function SlideInsights({ data }: { data: PresentationData }) {
+function navigateForInsight(insight: Insight): { tab: AttivaTabId; section?: string } | null {
+  switch (insight.type) {
+    case "crediteur":
+    case "actie":
+      return { tab: "crediteuren" };
+    case "concentratie":
+    case "groei":
+      return { tab: "financieel", section: "sectie-omzet-categorie" };
+    case "marge":
+      return { tab: "financieel", section: "sectie-marge" };
+    case "trend":
+    case "anomalie":
+      return { tab: "financieel", section: "sectie-omzet-kosten" };
+    default:
+      return null;
+  }
+}
+
+function SlideInsights({
+  data, onInsightClick,
+}: {
+  data: PresentationData;
+  onInsightClick?: (tab: AttivaTabId, section?: string) => void;
+}) {
   return (
     <div className="space-y-8">
       <div className="text-center">
@@ -217,13 +255,19 @@ function SlideInsights({ data }: { data: PresentationData }) {
           AI Smart Insights
         </div>
         <h2 className="text-4xl font-bold text-white">3 acties voor deze week</h2>
+        {onInsightClick && (
+          <p className="text-white/40 text-xs mt-2">Klik een inzicht om naar de details te springen</p>
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {data.insights.map((ins, i) => {
           const s = SEVERITY_BG[ins.severity] ?? SEVERITY_BG.info;
           const Icon = SEVERITY_ICON[ins.severity] ?? Info;
-          return (
-            <div key={i} className={`${s.bg} ${s.border} border-2 rounded-2xl p-6 space-y-3`}>
+          const target = navigateForInsight(ins);
+          const clickable = !!(onInsightClick && target);
+
+          const inner = (
+            <>
               <div className="flex items-start gap-3">
                 <div className={`w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm flex-shrink-0`}>
                   <Icon size={22} className={s.iconColor} />
@@ -239,6 +283,28 @@ function SlideInsights({ data }: { data: PresentationData }) {
                 <div className={`text-4xl font-bold ${s.iconColor}`}>{ins.cijfer}</div>
               )}
               <p className={`text-sm ${s.text} leading-relaxed`}>{ins.beschrijving}</p>
+              {clickable && (
+                <div className={`pt-2 text-[10px] font-bold uppercase tracking-widest ${s.iconColor} text-right`}>
+                  Bekijk →
+                </div>
+              )}
+            </>
+          );
+
+          if (clickable && target) {
+            return (
+              <button
+                key={i}
+                onClick={() => onInsightClick!(target.tab, target.section)}
+                className={`${s.bg} ${s.border} border-2 rounded-2xl p-6 space-y-3 text-left hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer`}
+              >
+                {inner}
+              </button>
+            );
+          }
+          return (
+            <div key={i} className={`${s.bg} ${s.border} border-2 rounded-2xl p-6 space-y-3`}>
+              {inner}
             </div>
           );
         })}
@@ -322,6 +388,74 @@ function SlideOmzetKosten({ data, onMaandClick }: { data: PresentationData; onMa
   );
 }
 
+function SlideOmzet({ data, onCategorieClick }: { data: PresentationData; onCategorieClick?: (naam: string, type: "omzet" | "kosten") => void }) {
+  const top = data.topOmzet.slice(0, 8);
+  if (top.length === 0) {
+    return (
+      <div className="text-center text-white/60 py-20">
+        Geen omzetcategorieën beschikbaar voor {data.jaar}.
+      </div>
+    );
+  }
+  function handleBarClick(rowData: { name: string }) {
+    if (onCategorieClick && rowData.name) onCategorieClick(rowData.name, "omzet");
+  }
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-4xl font-bold text-white mb-2">Omzet per categorie</h2>
+        <p className="text-white/50">
+          Waar komt het geld vandaan?
+          {onCategorieClick && <span className="ml-2 text-gold-400 text-xs">· Klik een categorie voor klant-uitsplitsing</span>}
+        </p>
+      </div>
+      <div className="bg-white rounded-3xl p-8 shadow-2xl">
+        <ResponsiveContainer width="100%" height={420}>
+          <BarChart data={top} layout="vertical" margin={{ left: 30, right: 60 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 13, fill: "#475569" }}
+              tickFormatter={v => `€${(v / 1000).toFixed(0)}K`} axisLine={false} tickLine={false} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: "#1B3A5C", fontWeight: 600 }}
+              axisLine={false} tickLine={false} width={200}
+              tickFormatter={(s: string) => s.length > 24 ? s.slice(0, 24) + "…" : s} />
+            <Tooltip formatter={(v) => euro(v as number)}
+              contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }} />
+            <Bar
+              dataKey="value"
+              fill="#1B3A5C"
+              radius={[0, 6, 6, 0]}
+              style={onCategorieClick ? { cursor: "pointer" } : undefined}
+              onClick={onCategorieClick ? handleBarClick : undefined}
+            >
+              {top.map((_, i) => (
+                <Cell key={i} fill={i === 0 ? "#1B3A5C" : i < 3 ? "#3B6EA5" : "#C9A84C"} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+
+        {onCategorieClick && (
+          <div className="grid grid-cols-2 gap-2 mt-6 pt-6 border-t border-gray-100">
+            {top.map((c, i) => (
+              <button
+                key={c.name}
+                onClick={() => onCategorieClick(c.name, "omzet")}
+                className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg text-left transition-colors"
+              >
+                <span className="w-6 h-6 rounded-full bg-navy-700/10 text-navy-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                  {i + 1}
+                </span>
+                <span className="text-sm text-navy-700 font-medium flex-1 truncate" title={c.name}>{c.name}</span>
+                <span className="text-sm font-bold text-navy-700 flex-shrink-0">{euro(c.value)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SlideKosten({ data, onCategorieClick }: { data: PresentationData; onCategorieClick?: (naam: string, type: "omzet" | "kosten") => void }) {
   const top = data.topKosten.slice(0, 8);
   function handleBarClick(rowData: { name: string }) {
@@ -384,13 +518,21 @@ function SlideKosten({ data, onCategorieClick }: { data: PresentationData; onCat
   );
 }
 
-function SlideCrediteuren({ data }: { data: PresentationData }) {
+function SlideCrediteuren({
+  data, onCrediteurClick,
+}: {
+  data: PresentationData;
+  onCrediteurClick?: () => void;
+}) {
   const urgentPct = data.totaalCrediteuren > 0 ? (data.totaal90Plus / data.totaalCrediteuren) * 100 : 0;
   return (
     <div className="space-y-8">
       <div className="text-center">
         <h2 className="text-4xl font-bold text-white mb-2">Openstaande crediteuren</h2>
-        <p className="text-white/50">Peildatum vandaag</p>
+        <p className="text-white/50">
+          Peildatum vandaag
+          {onCrediteurClick && <span className="ml-2 text-gold-400 text-xs">· Klik een crediteur voor factuurdetails</span>}
+        </p>
       </div>
       <div className="grid grid-cols-3 gap-6">
         <BigKpi label="Totaal open" value={euro(data.totaalCrediteuren)} accent="gold" />
@@ -405,12 +547,12 @@ function SlideCrediteuren({ data }: { data: PresentationData }) {
       {data.topCrediteuren.length > 0 && (
         <div className="bg-white rounded-3xl p-8 shadow-2xl">
           <h3 className="text-lg font-bold text-navy-700 mb-4">Top 5 crediteuren</h3>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {data.topCrediteuren.slice(0, 5).map((c, i) => {
               const isUrgent = c.Age90Plus > 0;
               const max = data.topCrediteuren[0].totaal;
-              return (
-                <div key={c.Name} className="flex items-center gap-4">
+              const inner = (
+                <>
                   <span className="w-7 h-7 rounded-full bg-navy-700 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
                     {i + 1}
                   </span>
@@ -429,6 +571,23 @@ function SlideCrediteuren({ data }: { data: PresentationData }) {
                       />
                     </div>
                   </div>
+                </>
+              );
+
+              if (onCrediteurClick) {
+                return (
+                  <button
+                    key={c.Name}
+                    onClick={() => onCrediteurClick()}
+                    className="w-full flex items-center gap-4 px-2 py-2 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                  >
+                    {inner}
+                  </button>
+                );
+              }
+              return (
+                <div key={c.Name} className="flex items-center gap-4 px-2 py-2">
+                  {inner}
                 </div>
               );
             })}

@@ -875,6 +875,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           onClose={() => setShowPresentation(false)}
           onCategorieClick={(naam, type) => setDetailCategorie({ naam, type })}
           onMaandClick={(periode) => setDetailMaand(periode)}
+          onNavigate={onNavigate}
         />
       )}
 
