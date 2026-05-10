@@ -873,6 +873,8 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
             totaal90Plus: topCrediteuren.reduce((s, c) => s + (c.Age90Plus ?? 0), 0),
           }}
           onClose={() => setShowPresentation(false)}
+          onCategorieClick={(naam, type) => setDetailCategorie({ naam, type })}
+          onMaandClick={(periode) => setDetailMaand(periode)}
         />
       )}
 
@@ -929,7 +931,7 @@ function MaandDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
       onClick={onClose}
     >
@@ -1116,7 +1118,7 @@ function CategorieDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
       onClick={onClose}
     >

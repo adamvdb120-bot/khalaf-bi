@@ -59,10 +59,12 @@ const SEVERITY_ICON = {
 };
 
 export default function PresentationMode({
-  data, onClose,
+  data, onClose, onCategorieClick, onMaandClick,
 }: {
   data: PresentationData;
   onClose: () => void;
+  onCategorieClick?: (naam: string, type: "omzet" | "kosten") => void;
+  onMaandClick?: (periode: number) => void;
 }) {
   const [slide, setSlide] = useState(0);
 
@@ -134,8 +136,8 @@ export default function PresentationMode({
           {current === "title" && <SlideTitle data={data} />}
           {current === "insights" && <SlideInsights data={data} />}
           {current === "kpi" && <SlideKpi data={data} />}
-          {current === "omzetkosten" && <SlideOmzetKosten data={data} />}
-          {current === "kosten" && <SlideKosten data={data} />}
+          {current === "omzetkosten" && <SlideOmzetKosten data={data} onMaandClick={onMaandClick} />}
+          {current === "kosten" && <SlideKosten data={data} onCategorieClick={onCategorieClick} />}
           {current === "crediteuren" && <SlideCrediteuren data={data} />}
         </div>
       </div>
@@ -281,12 +283,21 @@ function SlideKpi({ data }: { data: PresentationData }) {
   );
 }
 
-function SlideOmzetKosten({ data }: { data: PresentationData }) {
+function SlideOmzetKosten({ data, onMaandClick }: { data: PresentationData; onMaandClick?: (periode: number) => void }) {
+  const MAANDEN = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
+  function handleClick(rowData: { maand: string }) {
+    if (!onMaandClick) return;
+    const periode = MAANDEN.indexOf(rowData.maand) + 1;
+    if (periode > 0) onMaandClick(periode);
+  }
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-4xl font-bold text-white mb-2">Omzet vs Kosten per maand</h2>
-        <p className="text-white/50">{data.jaar}</p>
+        <p className="text-white/50">
+          {data.jaar}
+          {onMaandClick && <span className="ml-2 text-gold-400 text-xs">· Klik een maand voor details</span>}
+        </p>
       </div>
       <div className="bg-white rounded-3xl p-8 shadow-2xl">
         <ResponsiveContainer width="100%" height={420}>
@@ -298,8 +309,12 @@ function SlideOmzetKosten({ data }: { data: PresentationData }) {
             <Tooltip formatter={(v) => euro(v as number)}
               contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }} />
             <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 13 }} />
-            <Bar dataKey="omzet" name="Omzet" fill="#1B3A5C" radius={[6, 6, 0, 0]} />
-            <Bar dataKey="kosten" name="Kosten" fill="#C9A84C" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="omzet" name="Omzet" fill="#1B3A5C" radius={[6, 6, 0, 0]}
+              style={onMaandClick ? { cursor: "pointer" } : undefined}
+              onClick={onMaandClick ? handleClick : undefined} />
+            <Bar dataKey="kosten" name="Kosten" fill="#C9A84C" radius={[6, 6, 0, 0]}
+              style={onMaandClick ? { cursor: "pointer" } : undefined}
+              onClick={onMaandClick ? handleClick : undefined} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -307,13 +322,19 @@ function SlideOmzetKosten({ data }: { data: PresentationData }) {
   );
 }
 
-function SlideKosten({ data }: { data: PresentationData }) {
+function SlideKosten({ data, onCategorieClick }: { data: PresentationData; onCategorieClick?: (naam: string, type: "omzet" | "kosten") => void }) {
   const top = data.topKosten.slice(0, 8);
+  function handleBarClick(rowData: { name: string }) {
+    if (onCategorieClick && rowData.name) onCategorieClick(rowData.name, "kosten");
+  }
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-4xl font-bold text-white mb-2">Top kostenposten</h2>
-        <p className="text-white/50">Waar gaat het geld heen?</p>
+        <p className="text-white/50">
+          Waar gaat het geld heen?
+          {onCategorieClick && <span className="ml-2 text-gold-400 text-xs">· Klik een kostenpost voor leverancier-uitsplitsing</span>}
+        </p>
       </div>
       <div className="bg-white rounded-3xl p-8 shadow-2xl">
         <ResponsiveContainer width="100%" height={420}>
@@ -326,13 +347,38 @@ function SlideKosten({ data }: { data: PresentationData }) {
               tickFormatter={(s: string) => s.length > 24 ? s.slice(0, 24) + "…" : s} />
             <Tooltip formatter={(v) => euro(v as number)}
               contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }} />
-            <Bar dataKey="value" fill="#C9A84C" radius={[0, 6, 6, 0]}>
+            <Bar
+              dataKey="value"
+              fill="#C9A84C"
+              radius={[0, 6, 6, 0]}
+              style={onCategorieClick ? { cursor: "pointer" } : undefined}
+              onClick={onCategorieClick ? handleBarClick : undefined}
+            >
               {top.map((_, i) => (
                 <Cell key={i} fill={i === 0 ? "#1B3A5C" : i < 3 ? "#C9A84C" : "#3B6EA5"} />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+
+        {/* Lijstweergave eronder ook klikbaar voor mobiel/leesbaarheid */}
+        {onCategorieClick && (
+          <div className="grid grid-cols-2 gap-2 mt-6 pt-6 border-t border-gray-100">
+            {top.map((k, i) => (
+              <button
+                key={k.name}
+                onClick={() => onCategorieClick(k.name, "kosten")}
+                className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg text-left transition-colors"
+              >
+                <span className="w-6 h-6 rounded-full bg-gold-500/15 text-gold-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                  {i + 1}
+                </span>
+                <span className="text-sm text-navy-700 font-medium flex-1 truncate" title={k.name}>{k.name}</span>
+                <span className="text-sm font-bold text-navy-700 flex-shrink-0">{euro(k.value)}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
