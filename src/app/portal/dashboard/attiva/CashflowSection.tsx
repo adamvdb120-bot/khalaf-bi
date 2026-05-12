@@ -11,9 +11,16 @@ import {
 } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
+import CashflowForecast from "@/components/portal/CashflowForecast";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
-interface ExactData { pl: PlRow[] | null; jaar: number }
+interface RawFactuur {
+  AccountName: string;
+  AccountCode: string;
+  Amount: number;
+  DueDate: string | null;
+}
+interface ExactData { pl: PlRow[] | null; jaar: number; crediteurenRaw?: RawFactuur[] | null }
 interface DeclaratieData {
   totaal: number;
   perMaand: { maand: string; bedrag: number }[];
@@ -338,6 +345,16 @@ export default function CashflowSection() {
           </p>
         </div>
       </div>
+
+      {/* Cashflow voorspelling 6 maanden vooruit */}
+      {cashflowData.length > 0 && (
+        <CashflowForecast
+          pl={data.pl ?? []}
+          plVorig={vorigData?.pl ?? []}
+          crediteurenRaw={data.crediteurenRaw ?? []}
+          jaar={jaar}
+        />
+      )}
 
       {/* Inkomsten vs Uitgaven per maand */}
       {cashflowData.length > 0 && (
