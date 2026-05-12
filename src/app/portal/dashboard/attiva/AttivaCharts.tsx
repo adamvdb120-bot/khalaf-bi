@@ -11,6 +11,7 @@ import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 import AutoInsights from "@/components/portal/AutoInsights";
 import ActivityFeed from "@/components/portal/ActivityFeed";
+import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
 import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
@@ -500,6 +501,16 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
+      {/* Doelen voortgang */}
+      {maandData.length > 0 && (
+        <DoelenVoortgang
+          jaar={data.jaar}
+          totaalOmzet={totaalOmzet}
+          totaalKosten={totaalKosten}
+          margePercent={margePercent}
+        />
+      )}
+
       {/* Je briefing — Smart Insights + Activity Feed naast elkaar */}
       {maandData.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
