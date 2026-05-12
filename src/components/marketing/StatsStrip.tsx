@@ -2,9 +2,9 @@ import { Clock, Database, Zap, ShieldCheck } from "lucide-react";
 
 const stats = [
   {
-    value: "30u",
-    label: "tijdsbesparing per maand",
-    sub: "geen Excel-handwerk meer",
+    value: "24/7",
+    label: "zien wat anderen missen",
+    sub: "beslis sneller, groei harder",
     icon: Clock,
   },
   {
