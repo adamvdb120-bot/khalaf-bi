@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Menu, X } from "lucide-react";
 
 const links = [
@@ -20,16 +21,15 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-navy-700 rounded-full flex items-center justify-center">
-              <span className="text-gold-500 font-bold text-sm">K</span>
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="font-bold text-navy-700 text-lg leading-none">KHALAF BI</span>
-              <span className="text-gold-500 text-[10px] font-medium tracking-widest uppercase leading-none">
-                Driven by data
-              </span>
-            </div>
+          <Link href="/" className="flex items-center" aria-label="Khalaf BI — home">
+            <Image
+              src="/logos/khalaf-bi.png"
+              alt="Khalaf BI"
+              width={170}
+              height={56}
+              priority
+              className="h-12 w-auto object-contain"
+            />
           </Link>
 
           {/* Desktop nav */}

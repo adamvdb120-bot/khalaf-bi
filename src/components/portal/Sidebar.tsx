@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, LogOut, Settings, Upload, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -42,17 +43,15 @@ export default function Sidebar() {
   return (
     <aside className="w-64 min-h-screen bg-navy-700 flex flex-col">
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-navy-600">
-        <Link href="/portal" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gold-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">K</span>
-          </div>
-          <div>
-            <div className="font-bold text-white text-sm leading-none">KHALAF BI</div>
-            <div className="text-gold-400 text-[9px] font-medium tracking-widest uppercase leading-none mt-0.5">
-              Driven by data
-            </div>
-          </div>
+      <div className="px-6 py-5 border-b border-navy-600">
+        <Link href="/portal" className="flex items-center justify-center bg-white/95 rounded-xl py-3 px-3">
+          <Image
+            src="/logos/khalaf-bi.png"
+            alt="Khalaf BI"
+            width={180}
+            height={60}
+            className="h-10 w-auto object-contain"
+          />
         </Link>
       </div>
 

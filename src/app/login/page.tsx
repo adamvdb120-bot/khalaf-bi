@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
@@ -34,18 +35,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-gold-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-lg">K</span>
-            </div>
-            <div className="text-left">
-              <div className="font-bold text-white text-xl leading-none">KHALAF BI</div>
-              <div className="text-gold-400 text-[10px] font-medium tracking-widest uppercase leading-none">
-                Driven by data
-              </div>
-            </div>
+          <div className="bg-white/95 rounded-2xl inline-flex p-5 mb-4 shadow-xl">
+            <Image
+              src="/logos/khalaf-bi.png"
+              alt="Khalaf BI"
+              width={240}
+              height={80}
+              priority
+              className="h-16 w-auto object-contain"
+            />
           </div>
-          <p className="text-navy-300 text-sm mt-3">Inloggen op uw klantportaal</p>
+          <p className="text-navy-300 text-sm">Inloggen op uw klantportaal</p>
         </div>
 
         {/* Card */}

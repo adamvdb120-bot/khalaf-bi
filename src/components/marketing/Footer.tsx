@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Linkedin, Mail, Phone } from "lucide-react";
 
 export default function Footer() {
@@ -8,16 +9,14 @@ export default function Footer() {
         <div className="grid md:grid-cols-4 gap-10 mb-12">
           {/* Branding */}
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-gold-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">K</span>
-              </div>
-              <div>
-                <div className="font-bold text-white text-lg leading-none">KHALAF BI</div>
-                <div className="text-gold-400 text-[10px] font-medium tracking-widest uppercase leading-none">
-                  Driven by data
-                </div>
-              </div>
+            <div className="bg-white/95 rounded-2xl inline-flex p-3 mb-5">
+              <Image
+                src="/logos/khalaf-bi.png"
+                alt="Khalaf BI"
+                width={200}
+                height={70}
+                className="h-14 w-auto object-contain"
+              />
             </div>
             <p className="text-navy-300 text-sm leading-relaxed max-w-xs">
               Geïntegreerde BI-oplossingen voor MKB-ondernemers. Jouw data
