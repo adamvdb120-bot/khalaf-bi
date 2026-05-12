@@ -184,7 +184,41 @@ export default function AutoInsights({
               const target = navigationTarget(ins);
               const clickable = !!(onNavigate && target);
 
-              const cardContent = (
+              // Compact = horizontale layout (icon links, content rechts), spaart verticale ruimte
+              const cardContent = compact ? (
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
+                    <TypeIcon size={17} className={s.iconColor} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h4 className={`font-bold text-sm leading-snug ${s.titleColor}`}>
+                        {ins.titel}
+                      </h4>
+                      <span className={`text-[9px] font-bold uppercase tracking-widest ${s.badgeBg} ${s.badgeText} px-1.5 py-0.5 rounded inline-flex items-center gap-1 flex-shrink-0`}>
+                        <SeverityIcon size={9} />
+                        {s.badge}
+                      </span>
+                    </div>
+                    {ins.cijfer && (
+                      <p className={`text-lg font-bold leading-tight mb-1 ${s.iconColor}`}>
+                        {ins.cijfer}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-700 leading-relaxed">
+                      {ins.beschrijving}
+                    </p>
+                    {clickable && (
+                      <div className="mt-2 flex items-center justify-end">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest ${s.iconColor} group-hover:gap-2 transition-all`}>
+                          Bekijk
+                          <ArrowUpRight size={11} />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
                 <>
                   <div className="flex items-start justify-between gap-2">
                     <div className={`w-9 h-9 rounded-xl ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
@@ -222,12 +256,16 @@ export default function AutoInsights({
                 </>
               );
 
+              const baseClass = compact
+                ? `${s.bg} ${s.border} border rounded-xl p-3.5 transition-all`
+                : `${s.bg} ${s.border} border rounded-xl p-4 flex flex-col gap-2.5 transition-all`;
+
               if (clickable && target) {
                 return (
                   <button
                     key={i}
                     onClick={() => onNavigate!(target.tab, target.section)}
-                    className={`group ${s.bg} ${s.border} border rounded-xl p-4 flex flex-col gap-2.5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer`}
+                    className={`group ${baseClass} text-left hover:shadow-md hover:-translate-y-0.5 cursor-pointer w-full`}
                   >
                     {cardContent}
                   </button>
@@ -235,10 +273,7 @@ export default function AutoInsights({
               }
 
               return (
-                <div
-                  key={i}
-                  className={`${s.bg} ${s.border} border rounded-xl p-4 flex flex-col gap-2.5 hover:shadow-sm transition-shadow`}
-                >
+                <div key={i} className={`${baseClass} hover:shadow-sm`}>
                   {cardContent}
                 </div>
               );
