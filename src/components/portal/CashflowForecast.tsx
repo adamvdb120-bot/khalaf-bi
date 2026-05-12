@@ -81,14 +81,20 @@ function buildForecast({
   const werkelijkeMaanden = Object.keys(huidigPerMaand).map(Number).sort((a, b) => a - b);
   const laatsteWerkelijkeMaand = werkelijkeMaanden.length > 0 ? Math.max(...werkelijkeMaanden) : 0;
 
-  // 2) Gemiddelde van laatste 3 maanden = baseline
+  // 2) Conservatieve baseline: 70% gewicht op heel-jaar gemiddelde,
+  //    30% op laatste 3 maanden. Voorkomt dat een uitschieter (zoals een
+  //    sterke decembermaand) de hele voorspelling onrealistisch optilt.
   const recente = werkelijkeMaanden.slice(-3);
-  const gemOmzet = recente.length > 0
-    ? recente.reduce((s, m) => s + (huidigPerMaand[m]?.in ?? 0), 0) / recente.length
-    : 0;
-  const gemKosten = recente.length > 0
-    ? recente.reduce((s, m) => s + (huidigPerMaand[m]?.uit ?? 0), 0) / recente.length
-    : 0;
+  const gem3Omzet = recente.length > 0
+    ? recente.reduce((s, m) => s + (huidigPerMaand[m]?.in ?? 0), 0) / recente.length : 0;
+  const gem3Kosten = recente.length > 0
+    ? recente.reduce((s, m) => s + (huidigPerMaand[m]?.uit ?? 0), 0) / recente.length : 0;
+  const gemJaarOmzet = werkelijkeMaanden.length > 0
+    ? werkelijkeMaanden.reduce((s, m) => s + (huidigPerMaand[m]?.in ?? 0), 0) / werkelijkeMaanden.length : 0;
+  const gemJaarKosten = werkelijkeMaanden.length > 0
+    ? werkelijkeMaanden.reduce((s, m) => s + (huidigPerMaand[m]?.uit ?? 0), 0) / werkelijkeMaanden.length : 0;
+  const gemOmzet = 0.7 * gemJaarOmzet + 0.3 * gem3Omzet;
+  const gemKosten = 0.7 * gemJaarKosten + 0.3 * gem3Kosten;
 
   // 3) Bekende crediteur uitgaven per maand (vervalt in X)
   const credPerMaand: Record<string, number> = {}; // key: "YYYY-MM"
@@ -419,13 +425,6 @@ export default function CashflowForecast({
               axisLine={false} tickLine={false}
               tickFormatter={euroK}
             />
-            <YAxis
-              yAxisId="line"
-              orientation="right"
-              tick={{ fontSize: 11, fill: "#94a3b8" }}
-              axisLine={false} tickLine={false}
-              tickFormatter={euroK}
-            />
             <Tooltip
               formatter={(v, name) => {
                 if (v === null || v === undefined) return ["—", name];
@@ -441,7 +440,7 @@ export default function CashflowForecast({
             <ReferenceLine yAxisId="bars" y={0} stroke="#cbd5e1" />
             {/* Drempel als horizontale lijn op de saldo-as */}
             <ReferenceLine
-              yAxisId="line"
+              yAxisId="bars"
               y={drempel}
               stroke="#ef4444"
               strokeDasharray="4 4"
@@ -466,8 +465,8 @@ export default function CashflowForecast({
             </Bar>
 
             {/* Saldo — één doorlopende lijn met solid → dashed overgang */}
-            <Line yAxisId="line" type="monotone" dataKey="saldoWerkelijk" name="Saldo" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: "#10b981" }} connectNulls={false} />
-            <Line yAxisId="line" type="monotone" dataKey="saldoVoorspeld" name="Saldo (voorspeld)" stroke="#10b981" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 4, fill: "#fff", stroke: "#10b981", strokeWidth: 2 }} connectNulls={false} legendType="none" />
+            <Line yAxisId="bars" type="monotone" dataKey="saldoWerkelijk" name="Saldo" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: "#10b981" }} connectNulls={false} />
+            <Line yAxisId="bars" type="monotone" dataKey="saldoVoorspeld" name="Saldo (voorspeld)" stroke="#10b981" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 4, fill: "#fff", stroke: "#10b981", strokeWidth: 2 }} connectNulls={false} legendType="none" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -509,9 +508,10 @@ export default function CashflowForecast({
       </div>
 
       <p className="text-[11px] text-gray-400 italic">
-        ⓘ Voorspelling op basis van gemiddelde laatste 3 maanden + seizoenscorrectie {jaar - 1}.
-        Bekende crediteur-vervaldata tellen alleen mee als ze boven het normale maandniveau uitkomen.
-        Geen rekening met aankomende ontvangsten waarvan we de datum niet weten.
+        ⓘ Voorspelling op basis van 12-maands gemiddelde (70%) + recente 3 maanden (30%) +
+        seizoenscorrectie {jaar - 1}. Conservatieve aanname: uitschieters drukken niet de hele
+        voorspelling. Bekende crediteur-vervaldata tellen mee als ze boven het normale maandniveau
+        uitkomen.
       </p>
     </div>
   );
