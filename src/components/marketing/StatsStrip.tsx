@@ -10,7 +10,7 @@ const stats = [
   {
     value: "100%",
     label: "real-time financieel inzicht",
-    sub: "direct uit Exact Online",
+    sub: "rechtstreeks uit je systemen",
     icon: Zap,
   },
   {
