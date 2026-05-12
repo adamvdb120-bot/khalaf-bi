@@ -397,7 +397,7 @@ export default function CashflowForecast({
           <div className="flex items-center gap-3 text-[10px] text-gray-500">
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-navy-700 rounded inline-block" /> Omzet</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gold-500 rounded inline-block" /> Kosten</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full inline-block" /> Saldo</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full inline-block" /> Lopend saldo</span>
             <span className="text-gray-400 italic ml-2">Lichter = voorspelling</span>
           </div>
         </div>
@@ -435,6 +435,11 @@ export default function CashflowForecast({
                 const point = payload?.[0]?.payload as { jaar: number; isVoorspelling: boolean } | undefined;
                 return point ? `${label} ${point.jaar}${point.isVoorspelling ? " (voorspelling)" : ""}` : label;
               }}
+              // Volgorde forceren: Omzet eerst, dan Kosten, dan Lopend saldo
+              itemSorter={(item) => {
+                const order: Record<string, number> = { "Omzet": 1, "Kosten": 2, "Lopend saldo": 3 };
+                return order[String(item.name)] ?? 99;
+              }}
             />
             {/* 0-as ter referentie tussen omzet (boven) en kosten (onder) */}
             <ReferenceLine yAxisId="bars" y={0} stroke="#cbd5e1" />
@@ -465,8 +470,8 @@ export default function CashflowForecast({
             </Bar>
 
             {/* Saldo — één doorlopende lijn met solid → dashed overgang */}
-            <Line yAxisId="bars" type="monotone" dataKey="saldoWerkelijk" name="Saldo" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: "#10b981" }} connectNulls={false} />
-            <Line yAxisId="bars" type="monotone" dataKey="saldoVoorspeld" name="Saldo (voorspeld)" stroke="#10b981" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 4, fill: "#fff", stroke: "#10b981", strokeWidth: 2 }} connectNulls={false} legendType="none" />
+            <Line yAxisId="bars" type="monotone" dataKey="saldoWerkelijk" name="Lopend saldo" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: "#10b981" }} connectNulls={false} />
+            <Line yAxisId="bars" type="monotone" dataKey="saldoVoorspeld" name="Lopend saldo" stroke="#10b981" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 4, fill: "#fff", stroke: "#10b981", strokeWidth: 2 }} connectNulls={false} legendType="none" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -507,12 +512,17 @@ export default function CashflowForecast({
         </table>
       </div>
 
-      <p className="text-[11px] text-gray-400 italic">
-        ⓘ Voorspelling op basis van 12-maands gemiddelde (70%) + recente 3 maanden (30%) +
-        seizoenscorrectie {jaar - 1}. Conservatieve aanname: uitschieters drukken niet de hele
-        voorspelling. Bekende crediteur-vervaldata tellen mee als ze boven het normale maandniveau
-        uitkomen.
-      </p>
+      <div className="text-[11px] text-gray-400 italic space-y-1">
+        <p>
+          ⓘ <strong>Lopend saldo</strong> = je banksaldo zoals het in de tijd opbouwt. Elke maand wordt het
+          netto resultaat (omzet − kosten) erbij opgeteld. Start je zonder banksaldo, dan begint de lijn
+          op €0.
+        </p>
+        <p>
+          Voorspelling op basis van 12-maands gemiddelde (70%) + recente 3 maanden (30%) +
+          seizoenscorrectie {jaar - 1}. Conservatief — uitschieters drukken niet de hele voorspelling.
+        </p>
+      </div>
     </div>
   );
 }
