@@ -209,27 +209,41 @@ export default function CashflowForecast({
     [pl, plVorig, crediteurenRaw, startSaldo, jaar, drempel, maandenVooruit]
   );
 
-  // Combineer voor de grafiek
+  // Combineer voor de grafiek — omzet positief, kosten negatief (cashflow-standaard)
+  // Saldo is één doorlopende lijn met overgang van solid → dashed
+  const overgangsIndex = historisch.length;
   const chartData = [
     ...historisch.map(p => ({
-      ...p,
-      werkelijkOmzet: p.verwachteOmzet,
-      werkelijkKosten: p.verwachteKosten,
-      voorspelOmzet: null as number | null,
-      voorspelKosten: null as number | null,
-      werkelijkCumulatief: p.cumulatief,
-      voorspelCumulatief: null as number | null,
+      label: p.label,
+      jaar: p.jaar,
+      periode: p.periode,
+      isVoorspelling: false,
+      isOnderDrempel: false,
+      // Omzet positief
+      omzet: p.verwachteOmzet,
+      // Kosten als negatief getal (gaat onder nullijn)
+      kosten: -(p.verwachteKosten + p.bekendeCrediteurUitgaven),
+      // Eén doorlopende cumulatief-lijn (werkelijk deel)
+      saldoWerkelijk: p.cumulatief,
+      saldoVoorspeld: null as number | null,
     })),
-    ...forecast.map(p => ({
-      ...p,
-      werkelijkOmzet: null,
-      werkelijkKosten: null,
-      voorspelOmzet: p.verwachteOmzet,
-      voorspelKosten: -(p.verwachteKosten + p.bekendeCrediteurUitgaven),
-      werkelijkCumulatief: null,
-      voorspelCumulatief: p.cumulatief,
+    ...forecast.map((p, i) => ({
+      label: p.label,
+      jaar: p.jaar,
+      periode: p.periode,
+      isVoorspelling: true,
+      isOnderDrempel: !!p.isOnderDrempel,
+      omzet: p.verwachteOmzet,
+      kosten: -(p.verwachteKosten + p.bekendeCrediteurUitgaven),
+      // Eerste forecast-punt herhaalt laatste werkelijke waarde voor continuïteit
+      saldoWerkelijk: i === 0 ? historisch[historisch.length - 1]?.cumulatief ?? null : null,
+      saldoVoorspeld: p.cumulatief,
     })),
   ];
+  // Zorg dat de stippellijn aansluit bij de volle lijn
+  if (chartData[overgangsIndex - 1] && chartData[overgangsIndex]) {
+    chartData[overgangsIndex - 1].saldoVoorspeld = chartData[overgangsIndex - 1].saldoWerkelijk;
+  }
 
   // Verzamel insights
   const eersteMaandOnder = forecast.find(p => p.isOnderDrempel);
@@ -372,9 +386,17 @@ export default function CashflowForecast({
 
       {/* Forecast grafiek */}
       <div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Cashflow per maand</p>
-        <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart data={chartData}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cashflow per maand</p>
+          <div className="flex items-center gap-3 text-[10px] text-gray-500">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-navy-700 rounded inline-block" /> Omzet</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gold-500 rounded inline-block" /> Kosten</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full inline-block" /> Saldo</span>
+            <span className="text-gray-400 italic ml-2">Lichter = voorspelling</span>
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={340}>
+          <ComposedChart data={chartData} stackOffset="sign">
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
             <XAxis
               dataKey="label"
@@ -405,27 +427,47 @@ export default function CashflowForecast({
               tickFormatter={euroK}
             />
             <Tooltip
-              formatter={(v) => v === null || v === undefined ? "—" : euro(Math.abs(Number(v)))}
+              formatter={(v, name) => {
+                if (v === null || v === undefined) return ["—", name];
+                return [euro(Math.abs(Number(v))), name];
+              }}
               contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
               labelFormatter={(label, payload) => {
-                const point = payload?.[0]?.payload as ForecastPoint | undefined;
+                const point = payload?.[0]?.payload as { jaar: number; isVoorspelling: boolean } | undefined;
                 return point ? `${label} ${point.jaar}${point.isVoorspelling ? " (voorspelling)" : ""}` : label;
               }}
             />
-            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-            <ReferenceLine yAxisId="line" y={drempel} stroke="#ef4444" strokeDasharray="4 4" label={{ value: `Drempel ${euroK(drempel)}`, fill: "#ef4444", fontSize: 10, position: "right" }} />
+            {/* 0-as ter referentie tussen omzet (boven) en kosten (onder) */}
+            <ReferenceLine yAxisId="bars" y={0} stroke="#cbd5e1" />
+            {/* Drempel als horizontale lijn op de saldo-as */}
+            <ReferenceLine
+              yAxisId="line"
+              y={drempel}
+              stroke="#ef4444"
+              strokeDasharray="4 4"
+              label={{ value: `Drempel ${euroK(drempel)}`, fill: "#ef4444", fontSize: 10, position: "insideTopRight" }}
+            />
 
-            <Bar yAxisId="bars" dataKey="werkelijkOmzet" name="Omzet (werkelijk)" fill="#1B3A5C" radius={[4, 4, 0, 0]} stackId="werkelijk" />
-            <Bar yAxisId="bars" dataKey="werkelijkKosten" name="Kosten (werkelijk)" fill="#C9A84C" radius={[4, 4, 0, 0]} stackId="werkelijk" />
-            <Bar yAxisId="bars" dataKey="voorspelOmzet" name="Omzet (voorspeld)" fill="#1B3A5C" fillOpacity={0.5} radius={[4, 4, 0, 0]} stackId="voorspeld" />
-            <Bar yAxisId="bars" dataKey="voorspelKosten" name="Kosten (voorspeld)" fill="#C9A84C" fillOpacity={0.5} radius={[4, 4, 0, 0]} stackId="voorspeld">
+            {/* Omzet — positief, boven nullijn */}
+            <Bar yAxisId="bars" dataKey="omzet" name="Omzet" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, i) => (
-                <Cell key={i} fill={entry.isOnderDrempel ? "#fca5a5" : "#C9A84C"} fillOpacity={0.5} />
+                <Cell key={i} fill="#1B3A5C" fillOpacity={entry.isVoorspelling ? 0.45 : 1} />
+              ))}
+            </Bar>
+            {/* Kosten — negatief, onder nullijn */}
+            <Bar yAxisId="bars" dataKey="kosten" name="Kosten" radius={[0, 0, 4, 4]}>
+              {chartData.map((entry, i) => (
+                <Cell
+                  key={i}
+                  fill={entry.isOnderDrempel ? "#ef4444" : "#C9A84C"}
+                  fillOpacity={entry.isVoorspelling ? 0.45 : 1}
+                />
               ))}
             </Bar>
 
-            <Line yAxisId="line" type="monotone" dataKey="werkelijkCumulatief" name="Saldo (werkelijk)" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4 }} />
-            <Line yAxisId="line" type="monotone" dataKey="voorspelCumulatief" name="Saldo (voorspeld)" stroke="#10b981" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 4 }} />
+            {/* Saldo — één doorlopende lijn met solid → dashed overgang */}
+            <Line yAxisId="line" type="monotone" dataKey="saldoWerkelijk" name="Saldo" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: "#10b981" }} connectNulls={false} />
+            <Line yAxisId="line" type="monotone" dataKey="saldoVoorspeld" name="Saldo (voorspeld)" stroke="#10b981" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 4, fill: "#fff", stroke: "#10b981", strokeWidth: 2 }} connectNulls={false} legendType="none" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
