@@ -501,7 +501,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
-      {/* Doelen voortgang */}
+      {/* Doelen voortgang — TIJDELIJK UITGESCHAKELD (debug)
       {maandData.length > 0 && (
         <DoelenVoortgang
           jaar={data.jaar}
@@ -510,6 +510,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           margePercent={margePercent}
         />
       )}
+      */}
 
       {/* Je briefing — Smart Insights + Activity Feed naast elkaar */}
       {maandData.length > 0 && (
