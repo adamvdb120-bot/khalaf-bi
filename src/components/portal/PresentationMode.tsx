@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Cell,
@@ -110,18 +109,11 @@ export default function PresentationMode({
       style={{ minHeight: "100vh" }}
     >
       {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-4 border-b border-white/10">
-        <div className="flex items-center gap-4">
-          <div className="bg-white rounded-xl p-2 shadow-lg">
-            <Image
-              src="/logos/khalaf-bi.png"
-              alt="Khalaf BI"
-              width={140}
-              height={48}
-              className="h-9 w-auto object-contain"
-            />
+      <div className="flex items-center justify-between px-8 py-5 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+            <span className="text-navy-700 font-bold">K</span>
           </div>
-          <div className="h-9 w-px bg-white/20" />
           <div>
             <div className="text-white font-bold">{data.klantNaam}</div>
             <div className="text-gold-400 text-xs">Financieel overzicht · {data.jaar}</div>
@@ -208,16 +200,7 @@ export default function PresentationMode({
 
 function SlideTitle({ data }: { data: PresentationData }) {
   return (
-    <div className="text-center text-white space-y-6">
-      <div className="bg-white rounded-2xl inline-flex p-6 shadow-2xl">
-        <Image
-          src="/logos/khalaf-bi.png"
-          alt="Khalaf BI"
-          width={280}
-          height={100}
-          className="h-20 w-auto object-contain"
-        />
-      </div>
+    <div className="text-center text-white space-y-8">
       <div className="inline-flex items-center gap-2 bg-gold-500/15 text-gold-400 text-sm font-semibold px-4 py-2 rounded-full border border-gold-500/20">
         <Sparkles size={14} />
         <span>Financieel overzicht {data.jaar}</span>
