@@ -102,11 +102,12 @@ const TYPE_ICONS = {
 };
 
 export default function AutoInsights({
-  jaar, onNavigate, onInsightsLoaded,
+  jaar, onNavigate, onInsightsLoaded, compact = false,
 }: {
   jaar: number;
   onNavigate?: NavigateFn;
   onInsightsLoaded?: (insights: Insight[]) => void;
+  compact?: boolean;
 }) {
   const [data, setData] = useState<InsightResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,7 +165,7 @@ export default function AutoInsights({
           </button>
         </div>
 
-        {loading && <InsightsSkeleton />}
+        {loading && <InsightsSkeleton compact={compact} />}
 
         {error && (
           <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-700">
@@ -174,7 +175,7 @@ export default function AutoInsights({
         )}
 
         {!loading && !error && data && data.insights.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className={compact ? "space-y-3" : "grid grid-cols-1 md:grid-cols-3 gap-3"}>
             {data.insights.map((ins, i) => {
               const s = SEVERITY_STYLES[ins.severity] ?? SEVERITY_STYLES.info;
               const TypeIcon = TYPE_ICONS[ins.type] ?? Info;
@@ -253,9 +254,9 @@ export default function AutoInsights({
   );
 }
 
-function InsightsSkeleton() {
+function InsightsSkeleton({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div className={compact ? "space-y-3" : "grid grid-cols-1 md:grid-cols-3 gap-3"}>
       {[0, 1, 2].map((i) => (
         <div key={i} className="bg-gray-50 rounded-xl p-4 animate-pulse space-y-3">
           <div className="flex items-start justify-between">

@@ -500,25 +500,28 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
-      {/* Smart Insights — AI-driven samenvatting */}
+      {/* Je briefing — Smart Insights + Activity Feed naast elkaar */}
       {maandData.length > 0 && (
-        <AutoInsights
-          jaar={data.jaar}
-          onNavigate={onNavigate}
-          onInsightsLoaded={setInsightsForPresentation}
-        />
-      )}
-
-      {/* Activity feed — recente highlights uit de data */}
-      {maandData.length > 0 && (
-        <ActivityFeed
-          maandData={maandData}
-          vorigMaandData={vorigMaandData}
-          kostenPerCategorie={kostenPerCategorie}
-          omzetPerCategorie={omzetPerCategorie}
-          topCrediteuren={topCrediteuren}
-          jaar={data.jaar}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="lg:col-span-3">
+            <AutoInsights
+              jaar={data.jaar}
+              onNavigate={onNavigate}
+              onInsightsLoaded={setInsightsForPresentation}
+              compact
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <ActivityFeed
+              maandData={maandData}
+              vorigMaandData={vorigMaandData}
+              kostenPerCategorie={kostenPerCategorie}
+              omzetPerCategorie={omzetPerCategorie}
+              topCrediteuren={topCrediteuren}
+              jaar={data.jaar}
+            />
+          </div>
+        </div>
       )}
 
       {/* KPI Cards */}
