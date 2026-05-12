@@ -10,6 +10,7 @@ import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 import AutoInsights from "@/components/portal/AutoInsights";
+import ActivityFeed from "@/components/portal/ActivityFeed";
 import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
@@ -505,6 +506,18 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           jaar={data.jaar}
           onNavigate={onNavigate}
           onInsightsLoaded={setInsightsForPresentation}
+        />
+      )}
+
+      {/* Activity feed — recente highlights uit de data */}
+      {maandData.length > 0 && (
+        <ActivityFeed
+          maandData={maandData}
+          vorigMaandData={vorigMaandData}
+          kostenPerCategorie={kostenPerCategorie}
+          omzetPerCategorie={omzetPerCategorie}
+          topCrediteuren={topCrediteuren}
+          jaar={data.jaar}
         />
       )}
 
