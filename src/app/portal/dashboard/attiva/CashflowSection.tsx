@@ -20,7 +20,16 @@ interface RawFactuur {
   Amount: number;
   DueDate: string | null;
 }
-interface ExactData { pl: PlRow[] | null; jaar: number; crediteurenRaw?: RawFactuur[] | null }
+interface BankSaldoData {
+  opening: number;
+  perPeriode: { periode: number; saldo: number }[];
+}
+interface ExactData {
+  pl: PlRow[] | null;
+  jaar: number;
+  crediteurenRaw?: RawFactuur[] | null;
+  bankSaldo?: BankSaldoData;
+}
 interface DeclaratieData {
   totaal: number;
   perMaand: { maand: string; bedrag: number }[];
@@ -352,6 +361,7 @@ export default function CashflowSection() {
           pl={data.pl ?? []}
           plVorig={vorigData?.pl ?? []}
           crediteurenRaw={data.crediteurenRaw ?? []}
+          bankSaldo={data.bankSaldo}
           jaar={jaar}
         />
       )}

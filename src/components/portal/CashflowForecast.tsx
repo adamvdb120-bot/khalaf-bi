@@ -56,10 +56,12 @@ interface BuildForecastInput {
   jaar: number;
   drempel: number;
   maandenVooruit?: number;
+  werkelijkBankSaldo?: { periode: number; saldo: number }[];
 }
 
 function buildForecast({
   pl, plVorig, crediteurenRaw, startSaldo, jaar, drempel, maandenVooruit = 6,
+  werkelijkBankSaldo,
 }: BuildForecastInput): { historisch: ForecastPoint[]; forecast: ForecastPoint[] } {
   // 1) Bouw historische cashflow per maand uit pl
   const huidigPerMaand: Record<number, { in: number; uit: number }> = {};
@@ -180,14 +182,29 @@ function buildForecast({
     });
   }
 
-  // 6) Cumulatief saldo berekenen voor alle punten
+  // 6) Cumulatief saldo bouwen
+  // Voor historie: GEBRUIK WERKELIJK BANKSALDO uit Exact balansrekeningen 1000-1299.
+  // Geen netto-cashflow accumulatie (dat is onnauwkeurig — mist BTW, financiering, privé, etc.)
   let saldo = startSaldo;
-  // Voor historie willen we ook cumulatief vanaf start van het jaar tonen,
-  // dus startsaldo geldt voor BEGIN van eerste werkelijke maand.
-  for (const point of historisch) {
-    saldo += point.nettoCashflow;
-    point.cumulatief = Math.round(saldo);
+  const bankSaldoMap: Record<number, number> = {};
+  if (werkelijkBankSaldo) {
+    for (const b of werkelijkBankSaldo) {
+      bankSaldoMap[b.periode] = b.saldo;
+    }
   }
+
+  for (const point of historisch) {
+    const echtSaldo = bankSaldoMap[point.periode];
+    if (echtSaldo !== undefined) {
+      saldo = echtSaldo;
+      point.cumulatief = Math.round(echtSaldo);
+    } else {
+      saldo += point.nettoCashflow;
+      point.cumulatief = Math.round(saldo);
+    }
+  }
+
+  // Forecast bouwt voort op LAATSTE werkelijke saldo (= banksaldo van vandaag/laatste maand)
   for (const point of forecast) {
     saldo += point.nettoCashflow;
     point.cumulatief = Math.round(saldo);
@@ -198,21 +215,30 @@ function buildForecast({
 }
 
 export default function CashflowForecast({
-  pl, plVorig, crediteurenRaw, jaar,
+  pl, plVorig, crediteurenRaw, jaar, bankSaldo,
 }: {
   pl: PlRow[];
   plVorig: PlRow[];
   crediteurenRaw: RawFactuur[];
   jaar: number;
+  bankSaldo?: { opening: number; perPeriode: { periode: number; saldo: number }[] };
 }) {
-  const [startSaldo, setStartSaldo] = useState<number>(0);
+  // Echt banksaldo gebruiken als startwaarde — vanaf opening van het jaar
+  const autoStartSaldo = bankSaldo?.opening ?? 0;
+  const heeftEchtBankSaldo = !!bankSaldo && bankSaldo.perPeriode.length > 0;
+
+  const [overrideStartSaldo, setOverrideStartSaldo] = useState<number | null>(null);
+  const startSaldo = overrideStartSaldo ?? autoStartSaldo;
   const [drempel, setDrempel] = useState<number>(20000);
   const [maandenVooruit, setMaandenVooruit] = useState<number>(6);
   const [showSettings, setShowSettings] = useState(false);
 
   const { historisch, forecast } = useMemo(
-    () => buildForecast({ pl, plVorig, crediteurenRaw, startSaldo, jaar, drempel, maandenVooruit }),
-    [pl, plVorig, crediteurenRaw, startSaldo, jaar, drempel, maandenVooruit]
+    () => buildForecast({
+      pl, plVorig, crediteurenRaw, startSaldo, jaar, drempel, maandenVooruit,
+      werkelijkBankSaldo: bankSaldo?.perPeriode,
+    }),
+    [pl, plVorig, crediteurenRaw, startSaldo, jaar, drempel, maandenVooruit, bankSaldo]
   );
 
   // Combineer voor de grafiek — omzet positief, kosten negatief (cashflow-standaard)
@@ -289,18 +315,35 @@ export default function CashflowForecast({
       {showSettings && (
         <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Huidig banksaldo</label>
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+              Banksaldo per 1 jan {jaar}
+              {heeftEchtBankSaldo && overrideStartSaldo === null && (
+                <span className="ml-2 text-emerald-600 font-bold normal-case">● auto</span>
+              )}
+            </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
               <input
                 type="number"
                 value={startSaldo}
-                onChange={(e) => setStartSaldo(Number(e.target.value))}
-                placeholder="50000"
+                onChange={(e) => setOverrideStartSaldo(Number(e.target.value))}
+                placeholder="0"
                 className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-700/20 focus:border-navy-700"
               />
             </div>
-            <p className="text-[10px] text-gray-400 mt-1">Optioneel — toont absoluut saldo ipv delta</p>
+            <p className="text-[10px] text-gray-400 mt-1">
+              {heeftEchtBankSaldo
+                ? "Automatisch uit Exact (GL 1000-1299) — pas aan om te overschrijven"
+                : "Vul handmatig in (geen banksaldo uit Exact gevonden)"}
+            </p>
+            {overrideStartSaldo !== null && heeftEchtBankSaldo && (
+              <button
+                onClick={() => setOverrideStartSaldo(null)}
+                className="text-[10px] text-navy-700 hover:underline mt-0.5"
+              >
+                ↺ Reset naar auto (€{autoStartSaldo.toLocaleString("nl-NL")})
+              </button>
+            )}
           </div>
           <div>
             <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Alarm-drempel</label>
@@ -514,9 +557,13 @@ export default function CashflowForecast({
 
       <div className="text-[11px] text-gray-400 italic space-y-1">
         <p>
-          ⓘ <strong>Lopend saldo</strong> = je banksaldo zoals het in de tijd opbouwt. Elke maand wordt het
-          netto resultaat (omzet − kosten) erbij opgeteld. Start je zonder banksaldo, dan begint de lijn
-          op €0.
+          ⓘ <strong>Lopend saldo</strong> = je werkelijke banksaldo {heeftEchtBankSaldo ? (
+            <>(automatisch uit Exact, GL-rekeningen 1000-1299: kas/bank/spaar). Vanaf de laatste
+            werkelijke maand bouwt de voorspelling verder op de verwachte netto cashflow.</>
+          ) : (
+            <>— vul handmatig in via Aannames om realistisch te voorspellen. Zonder banksaldo
+            toont de lijn de cumulatieve netto cashflow vanaf €0.</>
+          )}
         </p>
         <p>
           Voorspelling op basis van 12-maands gemiddelde (70%) + recente 3 maanden (30%) +

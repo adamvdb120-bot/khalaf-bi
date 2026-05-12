@@ -190,6 +190,48 @@ function buildAgedList(invoices: unknown[] | null) {
   }));
 }
 
+// Bank/kas/spaar GL-rekeningen — Nederlandse standaardcodering 1000-1299
+// Bouw cumulatief saldo per maand op (debit - credit, want bank = asset = debit-side)
+function buildBankSaldoPerMaand(balances: unknown[] | null) {
+  if (!Array.isArray(balances)) return { opening: 0, perPeriode: [] as { periode: number; saldo: number }[] };
+
+  const perPeriod: Record<number, number> = {};
+  let opening = 0;
+
+  for (const raw of balances) {
+    const row = raw as {
+      GLAccountCode?: string;
+      AmountDebit?: number;
+      AmountCredit?: number;
+      ReportingPeriod?: number;
+    };
+    const codeNum = parseInt(row.GLAccountCode ?? "0", 10);
+    if (codeNum < 1000 || codeNum >= 1300) continue; // alleen liquide middelen
+
+    const beweging = (row.AmountDebit ?? 0) - (row.AmountCredit ?? 0);
+    const periode = row.ReportingPeriod ?? 0;
+
+    if (periode === 0) {
+      // Period 0 = beginbalans uit vorig jaar (als beschikbaar in BalanceLines)
+      opening += beweging;
+    } else if (periode >= 1 && periode <= 12) {
+      perPeriod[periode] = (perPeriod[periode] ?? 0) + beweging;
+    }
+  }
+
+  // Bouw cumulatieve banksaldo per maand
+  let saldo = opening;
+  const perPeriode: { periode: number; saldo: number }[] = [];
+  for (let p = 1; p <= 12; p++) {
+    saldo += perPeriod[p] ?? 0;
+    if (perPeriod[p] !== undefined || p === 1) {
+      perPeriode.push({ periode: p, saldo: Math.round(saldo) });
+    }
+  }
+
+  return { opening: Math.round(opening), perPeriode };
+}
+
 function buildOmzetPerKlant(facturen: unknown[] | null) {
   const map: Record<string, { naam: string; omzet: number }> = {};
   if (!Array.isArray(facturen)) return [];
@@ -330,6 +372,7 @@ export async function GET(req: Request) {
   const huidigeData = {
     division, jaar,
     pl: buildPl(balances),
+    bankSaldo: buildBankSaldoPerMaand(balances),
     debiteuren: buildAgedList(debiteuren),
     crediteuren: buildAgedList(crediteuren),
     debiteurenRaw: compactInvoice(debiteuren),
@@ -339,7 +382,15 @@ export async function GET(req: Request) {
 
   // Als jaarVorig meegegeven: geef beide jaren terug in één response
   const responseData = jaarVorig && balancesVorig !== undefined
-    ? { huidig: huidigeData, vorig: { division, jaar: jaarVorig, pl: buildPl(balancesVorig), debiteuren: [], crediteuren: [], omzetPerKlant: [] } }
+    ? {
+        huidig: huidigeData,
+        vorig: {
+          division, jaar: jaarVorig,
+          pl: buildPl(balancesVorig),
+          bankSaldo: buildBankSaldoPerMaand(balancesVorig),
+          debiteuren: [], crediteuren: [], omzetPerKlant: [],
+        },
+      }
     : huidigeData;
 
   // Sla op in Supabase cache
