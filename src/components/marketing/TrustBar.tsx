@@ -3,7 +3,6 @@
 const klanten = [
   { naam: "Attiva Zorg", logo: "/logos/attiva.svg", sector: "Zorg" },
   { naam: "Areys Restaurant", logo: "/logos/areys.svg", sector: "Horeca" },
-  { naam: "Markaz Quba", logo: "/logos/quba.svg", sector: "Stichting" },
 ];
 
 export default function TrustBar() {
