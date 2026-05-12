@@ -243,9 +243,13 @@ export default function CashflowForecast({
 
   // Combineer voor de grafiek — omzet positief, kosten negatief (cashflow-standaard)
   // Saldo is één doorlopende lijn met overgang van solid → dashed
+  // Forecast-labels krijgen jaar-suffix om duplicate maandnamen op de X-as te voorkomen
+  // (anders raakt Recharts tooltip in de war tussen historisch "Jan 2025" en forecast "Jan 2026")
   const overgangsIndex = historisch.length;
+  const historischLabels = new Set(historisch.map(h => h.label));
   const chartData = [
     ...historisch.map(p => ({
+      xLabel: p.label, // bv. "Jan" — uniek binnen historisch jaar
       label: p.label,
       jaar: p.jaar,
       periode: p.periode,
@@ -260,6 +264,8 @@ export default function CashflowForecast({
       saldoVoorspeld: null as number | null,
     })),
     ...forecast.map((p, i) => ({
+      // Als de maand al voorkomt in historisch, suffix met jaar (bv. "Jan '26")
+      xLabel: historischLabels.has(p.label) ? `${p.label} '${String(p.jaar).slice(-2)}` : p.label,
       label: p.label,
       jaar: p.jaar,
       periode: p.periode,
@@ -448,7 +454,7 @@ export default function CashflowForecast({
           <ComposedChart data={chartData} stackOffset="sign">
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
             <XAxis
-              dataKey="label"
+              dataKey="xLabel"
               tick={(props) => {
                 const { x, y, payload, index } = props;
                 const point = chartData[index];
