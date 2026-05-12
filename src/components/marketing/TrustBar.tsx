@@ -12,24 +12,24 @@ export default function TrustBar() {
         <p className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">
           Vertrouwd door MKB-ondernemers in zorg, horeca en meer
         </p>
-        <div className="flex items-center justify-center flex-wrap gap-x-12 gap-y-6">
+        <div className="flex items-center justify-center flex-wrap gap-x-14 gap-y-6">
           {klanten.map((k) => (
             <div
               key={k.naam}
-              className="flex items-center gap-3 opacity-70 hover:opacity-100 transition-opacity grayscale hover:grayscale-0"
+              className="flex items-center gap-4 hover:scale-105 transition-transform"
               title={`${k.naam} — ${k.sector}`}
             >
               <img
                 src={k.logo}
                 alt={k.naam}
-                className="h-10 w-auto object-contain"
+                className="h-16 w-auto object-contain"
               />
-              <span className="text-sm font-semibold text-navy-700 hidden md:inline">
+              <span className="text-base font-bold text-navy-700 hidden md:inline">
                 {k.naam}
               </span>
             </div>
           ))}
-          <div className="text-sm text-gray-400 italic">
+          <div className="text-sm text-gray-400 italic border-l border-gray-200 pl-6">
             + nieuwe klanten in onboarding
           </div>
         </div>
