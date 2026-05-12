@@ -1,8 +1,11 @@
 import Hero from "@/components/marketing/Hero";
+import TrustBar from "@/components/marketing/TrustBar";
 import HowItWorks from "@/components/marketing/HowItWorks";
 import Features from "@/components/marketing/Features";
+import StatsStrip from "@/components/marketing/StatsStrip";
 import Cases from "@/components/marketing/Cases";
 import Pricing from "@/components/marketing/Pricing";
+import FAQ from "@/components/marketing/FAQ";
 import Link from "next/link";
 import { ArrowRight, Phone } from "lucide-react";
 
@@ -10,10 +13,13 @@ export default function HomePage() {
   return (
     <>
       <Hero />
+      <TrustBar />
       <HowItWorks />
       <Features />
+      <StatsStrip />
       <Cases />
       <Pricing />
+      <FAQ />
 
       {/* CTA sectie */}
       <section className="py-24 bg-navy-700 relative overflow-hidden">
