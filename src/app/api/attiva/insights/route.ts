@@ -186,11 +186,13 @@ REGELS:
 - Geef alleen feiten uit de data, verzin niets
 - Wees concreet met bedragen en percentages
 - Eén insight = één onderwerp
-- "alarm" = urgent (dreigend cashflow probleem, kosten exploderen)
-- "attention" = aandacht waard (afwijkende trend)
-- "positive" = goed nieuws (groei, gezonde marge)
-- "info" = neutrale observatie
-- Variation: pak liefst 3 verschillende types/severities`;
+- WEES STRENG met severity:
+  - "alarm" = ALLEEN bij urgente, deze-week-actie (bv. crediteur >90 dagen €>5K openstaand, dreigend liquiditeitsprobleem). Gebruik dit MAX 1x.
+  - "attention" = aandachtswaardige trend (dalende marge, kostenstijging, concentratierisico). Default.
+  - "positive" = duidelijk goed nieuws (groei, gezonde marge, betaalde grote post).
+  - "info" = neutrale observatie zonder actie nodig.
+- Geef bij voorkeur: 1 attention/info + 1 positive (als er positief nieuws is) + 1 zinvolle. Niet alles alarm.
+- BESCHRIJVING max 80 tekens! Houd het kort.`;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {

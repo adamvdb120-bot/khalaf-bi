@@ -139,22 +139,22 @@ URGENT CREDITEUREN (>90 dagen open):
 ${topUrgent.length > 0 ? `- Top: ${topUrgent.map(c => `${c.Name} (€${Math.round(c.Age90Plus ?? 0).toLocaleString("nl-NL")})`).join(", ")}` : ""}
 `.trim();
 
-  const prompt = `Je bent een financieel adviseur voor MKB-ondernemers. Schrijf een ULTRA-KORTE samenvatting van de financiële situatie in het Nederlands.
+  const prompt = `Je bent een financieel adviseur voor MKB-ondernemers. Vat de financiële situatie samen in MAX 2 ZINNEN TOTAAL.
 
 DATA:
 ${dataSummary}
 
 REGELS:
-- "samenvatting": MAX 2 zinnen. Wat is de kern van de situatie? Noem de hoofdoorzaak.
-- "aanbeveling": ÉÉN concrete actie die deze week genomen moet worden. Max 1 zin.
+- "samenvatting": ÉÉN zin. Wat is de kern van de situatie + de hoofdoorzaak.
+- "aanbeveling": ÉÉN korte zin met concrete actie.
 - Gebruik concrete cijfers (euro's en percentages).
 - Spreek de ondernemer aan ("je omzet...", niet "de omzet...").
-- Geen verkooppraat. Geen lijstjes. Geen blabla.
+- Wees direct. Geen blabla. Geen "Dit is een signaal dat..."
 
 Geef ANTWOORD als JSON:
 {
-  "samenvatting": "Eerste zin met de kern. Tweede zin met de oorzaak.",
-  "aanbeveling": "Concrete actie deze week."
+  "samenvatting": "Eén zin: kern + oorzaak.",
+  "aanbeveling": "Eén zin: concrete actie."
 }`;
 
   const apiKey = process.env.GROQ_API_KEY;

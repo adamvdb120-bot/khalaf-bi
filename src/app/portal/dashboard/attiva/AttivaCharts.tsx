@@ -532,54 +532,56 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         />
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-3 gap-5">
-        {/* Omzet */}
-        <div className="card border-t-4 border-t-navy-700">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-9 h-9 bg-navy-700/10 rounded-xl flex items-center justify-center">
-              <Euro size={16} className="text-navy-700" />
+      {/* KPI Cards — alleen tonen bij maand-filter (anders dubbel met Management Samenvatting) */}
+      {maand && (
+        <div className="grid grid-cols-3 gap-5">
+          {/* Omzet */}
+          <div className="card border-t-4 border-t-navy-700">
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-9 h-9 bg-navy-700/10 rounded-xl flex items-center justify-center">
+                <Euro size={16} className="text-navy-700" />
+              </div>
+              <Trend current={displayOmzet} previous={displayVorigOmzet} />
             </div>
-            <Trend current={displayOmzet} previous={displayVorigOmzet} />
+            <p className="text-sm text-gray-400 mb-1">Omzet {maand}</p>
+            <p className="text-2xl font-bold text-navy-700">{euro(displayOmzet)}</p>
+            {displayVorigOmzet > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigOmzet)}</p>}
           </div>
-          <p className="text-sm text-gray-400 mb-1">{maand ? `Omzet ${maand}` : "Totale omzet"}</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(displayOmzet)}</p>
-          {displayVorigOmzet > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigOmzet)}</p>}
-        </div>
 
-        {/* Kosten */}
-        <div className="card border-t-4 border-t-gold-500">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-9 h-9 bg-gold-500/10 rounded-xl flex items-center justify-center">
-              <Euro size={16} className="text-gold-500" />
+          {/* Kosten */}
+          <div className="card border-t-4 border-t-gold-500">
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-9 h-9 bg-gold-500/10 rounded-xl flex items-center justify-center">
+                <Euro size={16} className="text-gold-500" />
+              </div>
+              <Trend current={displayKosten} previous={displayVorigKosten} inverse />
             </div>
-            <Trend current={displayKosten} previous={displayVorigKosten} inverse />
+            <p className="text-sm text-gray-400 mb-1">Kosten {maand}</p>
+            <p className="text-2xl font-bold text-navy-700">{euro(displayKosten)}</p>
+            {displayVorigKosten > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigKosten)}</p>}
           </div>
-          <p className="text-sm text-gray-400 mb-1">{maand ? `Kosten ${maand}` : "Totale kosten"}</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(displayKosten)}</p>
-          {displayVorigKosten > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigKosten)}</p>}
-        </div>
 
-        {/* Resultaat */}
-        <div className={`card border-t-4 ${displayMarge >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
-          <div className="flex items-start justify-between mb-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${displayMarge >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
-              {displayMarge >= 0
-                ? <TrendingUp size={16} className="text-emerald-600" />
-                : <TrendingDown size={16} className="text-red-500" />}
+          {/* Resultaat */}
+          <div className={`card border-t-4 ${displayMarge >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
+            <div className="flex items-start justify-between mb-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${displayMarge >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+                {displayMarge >= 0
+                  ? <TrendingUp size={16} className="text-emerald-600" />
+                  : <TrendingDown size={16} className="text-red-500" />}
+              </div>
+              <Trend current={displayMarge} previous={displayVorigMarge} />
             </div>
-            <Trend current={displayMarge} previous={displayVorigMarge} />
+            <p className="text-sm text-gray-400 mb-1">Resultaat {maand}</p>
+            <p className={`text-2xl font-bold ${displayMarge >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              {euro(displayMarge)}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {displayMargePercent.toFixed(1)}% marge
+              {displayVorigMarge !== 0 && ` · vorig jaar: ${euro(displayVorigMarge)}`}
+            </p>
           </div>
-          <p className="text-sm text-gray-400 mb-1">{maand ? `Resultaat ${maand}` : "Nettoresultaat"}</p>
-          <p className={`text-2xl font-bold ${displayMarge >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {euro(displayMarge)}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {displayMargePercent.toFixed(1)}% marge
-            {displayVorigMarge !== 0 && ` · vorig jaar: ${euro(displayVorigMarge)}`}
-          </p>
         </div>
-      </div>
+      )}
 
       {/* Prognose kaart */}
       {toonPrognose && (

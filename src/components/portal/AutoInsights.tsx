@@ -178,25 +178,25 @@ export default function AutoInsights({
               const target = navigationTarget(ins);
               const clickable = !!(onNavigate && target);
 
-              // Compact = strakke lijst-row (geen grote gekleurde blokken meer)
+              // Compact = strakke 1-regel lijst (alleen titel + cijfer, geen beschrijving)
               const cardContent = compact ? (
-                <div className="flex items-center gap-3 py-1">
-                  {/* Severity dot ipv groot blok */}
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                <div className="flex items-center gap-3">
+                  {/* Severity dot — alleen rood bij echte alarm */}
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     ins.severity === "alarm" ? "bg-red-500" :
                     ins.severity === "attention" ? "bg-amber-500" :
-                    ins.severity === "positive" ? "bg-emerald-500" : "bg-blue-500"
+                    ins.severity === "positive" ? "bg-emerald-500" : "bg-gray-400"
                   }`} />
                   {/* Icon */}
-                  <TypeIcon size={14} className="text-gray-400 flex-shrink-0" />
-                  {/* Titel + beschrijving */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-navy-700 truncate">{ins.titel}</p>
-                    <p className="text-xs text-gray-500 truncate">{ins.beschrijving}</p>
-                  </div>
-                  {/* Cijfer rechts */}
+                  <TypeIcon size={13} className="text-gray-400 flex-shrink-0" />
+                  {/* Titel — 1 regel */}
+                  <p className="text-sm text-navy-700 flex-1 min-w-0 truncate">
+                    <span className="font-semibold">{ins.titel}</span>
+                    <span className="text-gray-500"> — {ins.beschrijving}</span>
+                  </p>
+                  {/* Cijfer rechts — alleen rood voor echte alarm */}
                   {ins.cijfer && (
-                    <span className={`text-sm font-bold flex-shrink-0 ${
+                    <span className={`text-sm font-bold flex-shrink-0 tabular-nums ${
                       ins.severity === "alarm" ? "text-red-600" :
                       ins.severity === "attention" ? "text-amber-600" :
                       ins.severity === "positive" ? "text-emerald-600" : "text-navy-700"
@@ -206,7 +206,7 @@ export default function AutoInsights({
                   )}
                   {/* Klik-arrow */}
                   {clickable && (
-                    <ArrowUpRight size={13} className="text-gray-300 group-hover:text-navy-700 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                    <ArrowUpRight size={12} className="text-gray-300 group-hover:text-navy-700 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                   )}
                 </div>
               ) : (
