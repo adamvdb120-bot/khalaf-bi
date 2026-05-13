@@ -41,8 +41,10 @@ export async function GET() {
   const notifications: Notification[] = [];
   const admin = createAdminClient();
 
-  // ─── Exact token status (alleen admins zien dit) ────────────────────────
-  if (isAdmin) {
+  // ─── Exact token status — voor admin EN attiva-klant zichtbaar ───────────
+  // (Attiva moet zelf ook weten als koppeling stuk is, want zij moeten opnieuw inloggen)
+  const checkExact = isAdmin || ownSlug === "attiva";
+  if (checkExact) {
     const { data: tokenRow } = await admin
       .from("exact_tokens")
       .select("client_name, expires_at")
@@ -55,10 +57,27 @@ export async function GET() {
         type: "exact",
         severity: "alarm",
         titel: "Exact Online niet gekoppeld",
-        beschrijving: "Attiva heeft geen actieve Exact-koppeling. Data kan niet vernieuwen.",
+        beschrijving: "Geen actieve koppeling — koppel opnieuw om data te kunnen vernieuwen.",
         href: "/portal/instellingen",
         klant: "Attiva Zorg",
       });
+    } else {
+      // Token-status check: access_token vervalt elke ~10 min en wordt auto-ververst.
+      // Maar als expires_at > 1 uur in het verleden zit, is de auto-refresh blijkbaar
+      // niet gelukt — dat duidt op een echt probleem (refresh_token verlopen / revoked).
+      const expiresAt = new Date(tokenRow.expires_at).getTime();
+      const eenUurGeleden = Date.now() - 60 * 60 * 1000;
+      if (expiresAt < eenUurGeleden) {
+        notifications.push({
+          id: "exact-expired",
+          type: "exact",
+          severity: "alarm",
+          titel: "Exact Online koppeling verlopen",
+          beschrijving: "Auto-refresh van token mislukt. Koppel opnieuw om data te ontvangen.",
+          href: "/portal/instellingen",
+          klant: "Attiva Zorg",
+        });
+      }
     }
   }
 
@@ -66,14 +85,24 @@ export async function GET() {
   for (const slug of klantenTeCheck) {
     if (slug !== "attiva") continue; // alleen Attiva heeft Exact-data
 
-    // Pak meest recente cache
-    const { data: cacheRow } = await admin
-      .from("exact_data_cache")
-      .select("data, updated_at")
-      .eq("client_name", slug)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Zoek de FINANCIËLE cache (key-format "YYYY-YYYY", bv "2025-2024").
+    // Niet zomaar de meest recente cache — die kan een AI-cache zijn (insights-2025,
+    // narratief-2025, omzet-per-klant-..., enz.) zonder pl/crediteuren.
+    const huidigJaar = new Date().getFullYear();
+    let cacheRow: { data: unknown; updated_at: string } | null = null;
+    for (const tryJaar of [huidigJaar, huidigJaar - 1, huidigJaar - 2]) {
+      const tryKey = `${tryJaar}-${tryJaar - 1}`;
+      const { data: row } = await admin
+        .from("exact_data_cache")
+        .select("data, updated_at")
+        .eq("client_name", slug)
+        .eq("cache_key", tryKey)
+        .maybeSingle();
+      if (row?.data) {
+        cacheRow = row;
+        break;
+      }
+    }
 
     if (!cacheRow?.data) continue;
 
