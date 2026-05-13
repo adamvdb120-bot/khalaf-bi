@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { BarChart2, FileText, TrendingUp, Wallet } from "lucide-react";
 import AttivaCharts from "./AttivaCharts";
 import DeclaratiesSection from "./DeclaratiesSection";
@@ -17,8 +18,34 @@ const TABS = [
 export type AttivaTabId = "financieel" | "cashflow" | "crediteuren" | "declaraties";
 
 export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
-  const [active, setActive] = useState<AttivaTabId>("financieel");
+  const searchParams = useSearchParams();
+  const initialTab = (() => {
+    const t = searchParams.get("tab");
+    if (t === "cashflow" || t === "crediteuren" || t === "declaraties") return t;
+    return "financieel";
+  })();
+  const [active, setActive] = useState<AttivaTabId>(initialTab);
   const [scrollTarget, setScrollTarget] = useState<string | null>(null);
+
+  // ?tab=… of #anchor in URL respecteren bij navigatie binnen de app
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "cashflow" || t === "crediteuren" || t === "declaraties" || t === "financieel") {
+      setActive(t);
+    }
+  }, [searchParams]);
+
+  // Hash (bv. #sectie-marge) → smooth scroll na laden
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [active]);
 
   // Cross-tab navigatie + smooth scroll naar sectie binnen de tab
   function navigate(tab: AttivaTabId, sectionId?: string) {

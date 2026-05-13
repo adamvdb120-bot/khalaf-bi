@@ -100,7 +100,8 @@ export async function GET() {
         beschrijving: topUrgent
           ? `Grootste: ${topUrgent.Name} (${euro(topUrgent.Age90Plus)})`
           : "Bekijk welke leveranciers contact nodig hebben",
-        href: "/portal/dashboard/attiva",
+        // ?tab=crediteuren wordt door AttivaTabs gelezen om direct de tab te openen
+        href: "/portal/dashboard/attiva?tab=crediteuren",
         klant: "Attiva Zorg",
         bedrag: euro(totaal90Plus),
       });
@@ -119,7 +120,7 @@ export async function GET() {
         severity: "alarm",
         titel: "Negatief jaarresultaat",
         beschrijving: `Verlies van ${euro(Math.abs(marge))} — kosten overstijgen omzet`,
-        href: "/portal/dashboard/attiva",
+        href: "/portal/dashboard/attiva#sectie-marge",
         klant: "Attiva Zorg",
         bedrag: `${margePct.toFixed(1)}%`,
       });
@@ -130,7 +131,7 @@ export async function GET() {
         severity: "attention",
         titel: "Zeer dunne marge",
         beschrijving: `Brutomarge is slechts ${margePct.toFixed(1)}% — onder kritische drempel`,
-        href: "/portal/dashboard/attiva",
+        href: "/portal/dashboard/attiva#sectie-marge",
         klant: "Attiva Zorg",
       });
     }

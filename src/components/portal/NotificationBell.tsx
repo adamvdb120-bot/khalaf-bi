@@ -173,7 +173,7 @@ export default function NotificationBell() {
                           </p>
                         )}
                       </div>
-                      <ArrowRight size={12} className="text-gray-300 group-hover:text-navy-700 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-2" />
+                      <ArrowRight size={14} className="text-gray-400 group-hover:text-navy-700 group-hover:translate-x-1 transition-all flex-shrink-0 mt-2" />
                     </Link>
                   );
                 })}
