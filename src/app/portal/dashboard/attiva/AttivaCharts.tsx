@@ -13,6 +13,7 @@ import AutoInsights from "@/components/portal/AutoInsights";
 import ActivityFeed from "@/components/portal/ActivityFeed";
 import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
 import ManagementSamenvatting from "@/components/portal/ManagementSamenvatting";
+import AINarratief from "@/components/portal/AINarratief";
 import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
@@ -502,7 +503,10 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
-      {/* Management samenvatting — executive overview bovenaan */}
+      {/* AI Narratief — executive briefing bovenaan, eerste indruk */}
+      {maandData.length > 0 && <AINarratief jaar={data.jaar} />}
+
+      {/* Management samenvatting — harde cijfers met YoY */}
       {maandData.length > 0 && (
         <ManagementSamenvatting
           jaar={data.jaar}
