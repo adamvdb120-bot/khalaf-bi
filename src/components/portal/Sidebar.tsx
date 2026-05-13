@@ -6,6 +6,7 @@ import { Home, LogOut, Settings, Upload, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import NotificationBell from "./NotificationBell";
 
 const nav = [
   { href: "/portal", label: "Overzicht", icon: Home, exact: true },
@@ -71,6 +72,9 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Meldingen — popup-paneel met urgent zaken */}
+        <NotificationBell />
 
         {/* Admin sectie */}
         {isAdmin && (
