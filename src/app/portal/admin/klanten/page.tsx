@@ -66,7 +66,7 @@ export default async function KlantenPage() {
 
   const { data: profiles } = await admin
     .from("profiles")
-    .select("id, full_name, company, role, created_at")
+    .select("id, full_name, company, role, client_slug, created_at")
     .order("created_at", { ascending: false });
 
   const { data: uploads } = await admin
@@ -179,6 +179,7 @@ export default async function KlantenPage() {
                   <th className="text-left font-medium py-3 px-5">Gebruiker</th>
                   <th className="text-left font-medium py-3 px-3">Bedrijf</th>
                   <th className="text-left font-medium py-3 px-3">Rol</th>
+                  <th className="text-left font-medium py-3 px-3">Dashboardtoegang</th>
                   <th className="text-right font-medium py-3 px-3">Uploads</th>
                   <th className="text-left font-medium py-3 px-3">Laatste activiteit</th>
                   <th className="text-right font-medium py-3 px-3">Lid sinds</th>
@@ -189,6 +190,8 @@ export default async function KlantenPage() {
                 {allProfiles.map((p) => {
                   const userUploads = uploadsPerUser.get(p.id) ?? [];
                   const laatste = userUploads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+                  const slug = (p as { client_slug?: string | null }).client_slug ?? null;
+                  const klantInfo = slug ? DEMO_CLIENTS.find(c => c.id === slug) : null;
                   return (
                     <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
                       <td className="py-3 px-5">
@@ -214,6 +217,26 @@ export default async function KlantenPage() {
                         }`}>
                           {p.role}
                         </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        {p.role === "admin" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide bg-gold-500/15 text-gold-700 px-2 py-0.5 rounded">
+                            Alle dashboards
+                          </span>
+                        ) : klantInfo ? (
+                          <span className="inline-flex items-center gap-2 text-xs">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={klantInfo.logo} alt={klantInfo.name} className="w-4 h-4 object-contain" />
+                            <span className="font-medium text-navy-700">{klantInfo.name}</span>
+                            <span className="text-[10px] text-gray-400">({slug})</span>
+                          </span>
+                        ) : slug ? (
+                          <span className="text-xs text-gray-500 italic">{slug}</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide bg-red-50 text-red-700 px-2 py-0.5 rounded">
+                            Geen toegang
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-right font-semibold text-navy-700">{userUploads.length}</td>
                       <td className="py-3 px-3 text-gray-500 text-xs">
