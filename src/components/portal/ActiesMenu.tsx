@@ -9,8 +9,10 @@ import { downloadDashboardPDF } from "@/lib/pdf-export";
 interface ActiesMenuProps {
   onRefresh: () => void;
   onPresentatie: () => void;
+  onRapport?: () => void;
   refreshing?: boolean;
   presentatieDisabled?: boolean;
+  /** legacy: directe PDF zonder modal */
   pdf?: {
     targetId: string;
     filename: string;
@@ -21,7 +23,7 @@ interface ActiesMenuProps {
 }
 
 export default function ActiesMenu({
-  onRefresh, onPresentatie, refreshing, presentatieDisabled, pdf,
+  onRefresh, onPresentatie, onRapport, refreshing, presentatieDisabled, pdf,
 }: ActiesMenuProps) {
   const [open, setOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -88,7 +90,21 @@ export default function ActiesMenu({
             </div>
           </button>
 
-          {pdf && (
+          {onRapport && (
+            <button
+              onClick={() => { onRapport(); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors text-left"
+            >
+              <FileText size={14} className="text-gray-400" />
+              <div>
+                <div className="font-semibold">Rapport genereren…</div>
+                <div className="text-[10px] text-gray-400">PDF met voorblad, samenvatting en grafieken</div>
+              </div>
+            </button>
+          )}
+
+          {/* Legacy: directe PDF (alleen als geen rapport-modal beschikbaar is) */}
+          {pdf && !onRapport && (
             <button
               onClick={handlePdf}
               disabled={pdfLoading}

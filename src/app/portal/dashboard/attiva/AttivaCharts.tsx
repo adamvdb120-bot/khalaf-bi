@@ -15,6 +15,7 @@ import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
 import ManagementSamenvatting from "@/components/portal/ManagementSamenvatting";
 import AINarratief from "@/components/portal/AINarratief";
 import ActiesMenu from "@/components/portal/ActiesMenu";
+import RapportModal from "@/components/portal/RapportModal";
 import ChatSidePanel from "@/components/portal/ChatSidePanel";
 import { MessageSquare } from "lucide-react";
 import PresentationMode from "@/components/portal/PresentationMode";
@@ -121,6 +122,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
   const [cacheStatus, setCacheStatus] = useState<"HIT" | "MISS" | null>(null);
   const [cacheAge, setCacheAge] = useState<number | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [rapportOpen, setRapportOpen] = useState(false);
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -487,14 +489,8 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           <ActiesMenu
             onRefresh={() => load(jaar, true)}
             onPresentatie={() => setShowPresentation(true)}
+            onRapport={() => setRapportOpen(true)}
             presentatieDisabled={maandData.length === 0}
-            pdf={{
-              targetId: "attiva-financieel-export",
-              filename: `Attiva-Zorg-Financieel-${jaar}`,
-              clientName: "Attiva Zorg",
-              reportType: "Financieel overzicht",
-              jaar,
-            }}
           />
         </div>
       </div>
@@ -965,6 +961,16 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           />
         </ChatSidePanel>
       )}
+
+      {/* Rapport-modal */}
+      <RapportModal
+        open={rapportOpen}
+        onClose={() => setRapportOpen(false)}
+        targetId="attiva-financieel-export"
+        clientName="Attiva Zorg"
+        clientSlug="attiva"
+        jaarDefault={jaar}
+      />
 
       {/* Presentation mode */}
       {showPresentation && (
