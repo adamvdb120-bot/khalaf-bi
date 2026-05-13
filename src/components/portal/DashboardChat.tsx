@@ -168,7 +168,7 @@ export default function DashboardChat({
               <div className="ml-10">
                 <ChartRenderer
                   chart={msg.chart}
-                  height={280}
+                  height={320}
                   onPin={pinChart}
                   question={msg.question}
                 />

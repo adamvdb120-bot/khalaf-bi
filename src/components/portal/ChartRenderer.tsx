@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { Pin, PinOff, Download, Check } from "lucide-react";
+import { Pin, Download, Check, Maximize2, X } from "lucide-react";
 
 export interface ChartDef {
   type: "bar" | "line" | "pie" | "none";
@@ -36,15 +36,28 @@ export function ChartRenderer({
   onPin,
   isPinned = false,
   question,
+  allowZoom = true,
 }: {
   chart: ChartDef;
   height?: number;
   onPin?: (chart: ChartDef, question?: string) => Promise<void>;
   isPinned?: boolean;
   question?: string;
+  allowZoom?: boolean; // disable zoom als grafiek al in modal staat
 }) {
   const [pinState, setPinState] = useState<"idle" | "loading" | "done">("idle");
+  const [zoomed, setZoomed] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Esc om zoom modal te sluiten
+  useEffect(() => {
+    if (!zoomed) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setZoomed(false);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [zoomed]);
 
   if (chart.type === "none" || !chart.data?.length) return null;
 
@@ -96,11 +109,22 @@ export function ChartRenderer({
   }
 
   return (
+    <>
     <div className="mt-3 bg-white rounded-xl border border-gray-100 overflow-hidden">
       {/* Chart header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <h4 className="font-semibold text-navy-700 text-sm">{chart.title}</h4>
         <div className="flex items-center gap-1">
+          {/* Vergroten button */}
+          {allowZoom && (
+            <button
+              onClick={() => setZoomed(true)}
+              title="Vergroot grafiek"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
+            >
+              <Maximize2 size={13} />
+            </button>
+          )}
           {/* Download button */}
           <button
             onClick={handleDownload}
@@ -192,5 +216,66 @@ export function ChartRenderer({
         </ResponsiveContainer>
       </div>
     </div>
+
+    {/* Zoom modal — toont dezelfde grafiek op groot formaat */}
+    {zoomed && (
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+        style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+        onClick={() => setZoomed(false)}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 className="font-bold text-navy-700 text-lg">{chart.title}</h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDownload}
+                title="Download als PNG"
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy-700 border border-gray-200 hover:border-navy-300 rounded-lg px-3 py-2 transition-colors"
+              >
+                <Download size={13} />
+                Download
+              </button>
+              {onPin && (
+                <button
+                  onClick={handlePin}
+                  disabled={pinState === "loading" || isPinned}
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
+                    pinState === "done" || isPinned
+                      ? "bg-emerald-50 text-emerald-600"
+                      : "bg-navy-700 text-white hover:bg-navy-600"
+                  }`}
+                >
+                  {pinState === "done" || isPinned ? (
+                    <><Check size={12} /> Gepind</>
+                  ) : pinState === "loading" ? (
+                    <><Pin size={12} /> Pinnen...</>
+                  ) : (
+                    <><Pin size={12} /> Pin aan dashboard</>
+                  )}
+                </button>
+              )}
+              <button
+                onClick={() => setZoomed(false)}
+                aria-label="Sluiten"
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Body — grote grafiek */}
+          <div className="flex-1 overflow-auto p-6">
+            <ChartRenderer chart={chart} height={460} allowZoom={false} question={question} />
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
