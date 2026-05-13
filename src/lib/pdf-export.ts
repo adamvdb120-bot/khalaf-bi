@@ -136,9 +136,9 @@ export async function generateRapportPDF(opts: RapportOpts): Promise<void> {
   window.scrollTo(0, 0);
   await new Promise(r => requestAnimationFrame(() => r(null)));
 
-  // Render dashboard naar canvas — scale verlaagd voor kleinere PDF
+  // Render dashboard naar canvas — scale 2 voor scherp leesbare tekst (retina-quality)
   const canvas = await html2canvas(element, {
-    scale: 1.5,
+    scale: 2,
     backgroundColor: "#ffffff",
     useCORS: true,
     logging: false,
@@ -149,7 +149,7 @@ export async function generateRapportPDF(opts: RapportOpts): Promise<void> {
 
   // Debug: log canvas dimensies (alleen client-side console)
   if (typeof window !== "undefined") {
-    console.log(`[PDF] canvas: ${canvas.width}×${canvas.height}px, scale 1.5`);
+    console.log(`[PDF] canvas: ${canvas.width}×${canvas.height}px, scale 2`);
   }
 
   const imgWidth = pageWidth;
