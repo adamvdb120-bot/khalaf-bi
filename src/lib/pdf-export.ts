@@ -132,20 +132,40 @@ export async function generateRapportPDF(opts: RapportOpts): Promise<void> {
   // ─── PAGINA 2+: DASHBOARD CONTENT ──────────────────────────────────────
   pdf.addPage();
 
-  // Render dashboard naar canvas
+  // Scroll naar top en wacht 1 frame, anders capture html2canvas evt. scroll-state
+  window.scrollTo(0, 0);
+  await new Promise(r => requestAnimationFrame(() => r(null)));
+
+  // Render dashboard naar canvas — scale verlaagd voor kleinere PDF
   const canvas = await html2canvas(element, {
-    scale: 2,
+    scale: 1.5,
     backgroundColor: "#ffffff",
     useCORS: true,
     logging: false,
+    // Voorkom dat html2canvas window-height berekening misgaat
+    windowWidth: element.scrollWidth,
+    windowHeight: element.scrollHeight,
   });
+
+  // Debug: log canvas dimensies (alleen client-side console)
+  if (typeof window !== "undefined") {
+    console.log(`[PDF] canvas: ${canvas.width}×${canvas.height}px, scale 1.5`);
+  }
 
   const imgWidth = pageWidth;
   const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  // Safety: cap aantal pagina's op 20. Voorkom runaway (423 pagina's bug).
+  const MAX_PAGES = 20;
+  const beoogdePaginas = Math.ceil(imgHeight / (pageHeight - 14));
+  if (beoogdePaginas > MAX_PAGES) {
+    console.warn(`[PDF] Dashboard zou ${beoogdePaginas} pagina's worden — gecapt op ${MAX_PAGES}`);
+  }
+  const totalPages = 1 + Math.min(beoogdePaginas, MAX_PAGES);
+
   let heightLeft = imgHeight;
   let position = 14; // ruimte voor header
   let pageNum = 2;
-  const totalPages = 1 + Math.ceil(imgHeight / (pageHeight - 14));
 
   function addHeader(num: number) {
     pdf.setFillColor(27, 58, 92);
@@ -162,17 +182,22 @@ export async function generateRapportPDF(opts: RapportOpts): Promise<void> {
     pdf.text(`Pagina ${num} / ${totalPages}`, pageWidth - 14, 8, { align: "right" });
   }
 
+  // JPEG ipv PNG → veel kleinere bestandsgrootte (10x kleiner typisch)
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+
   addHeader(pageNum);
-  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, position, imgWidth, imgHeight);
+  pdf.addImage(dataUrl, "JPEG", 0, position, imgWidth, imgHeight);
   heightLeft -= pageHeight - 14;
 
-  while (heightLeft > 0) {
+  let safetyCounter = 0;
+  while (heightLeft > 0 && safetyCounter < MAX_PAGES) {
     pdf.addPage();
     pageNum++;
     position = heightLeft - imgHeight + 14;
     addHeader(pageNum);
-    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, position, imgWidth, imgHeight);
+    pdf.addImage(dataUrl, "JPEG", 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight - 14;
+    safetyCounter++;
   }
 
   // ─── SAVE ──────────────────────────────────────────────────────────────

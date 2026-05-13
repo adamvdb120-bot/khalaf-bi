@@ -69,6 +69,10 @@ export default function RapportModal({ open, onClose, targetId, clientName, clie
   async function handleGenerate() {
     setGenerating(true);
     setError(null);
+    // Sluit de modal eerst zodat html2canvas een schone dashboard ziet,
+    // niet de modal met backdrop/blur. Wacht 250ms voor re-render.
+    onClose();
+    await new Promise(r => setTimeout(r, 250));
     try {
       await generateRapportPDF({
         targetId,
@@ -80,13 +84,11 @@ export default function RapportModal({ open, onClose, targetId, clientName, clie
         maand: maandSuffix,
         periodeLabel,
       });
-      // Sluiten na succes (kleine delay om download te laten starten)
-      setTimeout(() => {
-        setGenerating(false);
-        onClose();
-      }, 500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Genereren mislukt");
+      // Modal kan al gesloten zijn — toon dan een alert
+      alert(`PDF-genereren mislukt: ${e instanceof Error ? e.message : "Onbekende fout"}`);
+    } finally {
       setGenerating(false);
     }
   }
