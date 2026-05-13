@@ -12,6 +12,7 @@ import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 import AutoInsights from "@/components/portal/AutoInsights";
 import ActivityFeed from "@/components/portal/ActivityFeed";
 import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
+import ManagementSamenvatting from "@/components/portal/ManagementSamenvatting";
 import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
@@ -501,6 +502,15 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
+      {/* Management samenvatting — executive overview bovenaan */}
+      {maandData.length > 0 && (
+        <ManagementSamenvatting
+          jaar={data.jaar}
+          pl={data.pl ?? []}
+          vorigPl={vorigData?.pl ?? []}
+        />
+      )}
+
       {/* Doelen voortgang — TIJDELIJK UITGESCHAKELD (debug)
       {maandData.length > 0 && (
         <DoelenVoortgang
