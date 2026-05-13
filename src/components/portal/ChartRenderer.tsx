@@ -118,15 +118,22 @@ export function ChartRenderer({
     }
   }
 
+  // Inline-modus = compacte kaart in chat/pinned. Modal-modus = zonder header/border.
+  const inlineMode = allowZoom;
+  const wrapperClass = inlineMode
+    ? "mt-3 bg-white rounded-xl border border-gray-100 overflow-hidden"
+    : "bg-white rounded-xl overflow-hidden"; // geen border in modal — die heeft eigen kader
+  const chartPadding = inlineMode ? "px-2 pb-4" : "px-2 py-2"; // minder verticale ruimte in modal
+
   return (
     <>
-    <div className="mt-3 bg-white rounded-xl border border-gray-100 overflow-hidden">
-      {/* Chart header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <h4 className="font-semibold text-navy-700 text-sm">{chart.title}</h4>
-        <div className="flex items-center gap-1">
-          {/* Vergroten button */}
-          {allowZoom && (
+    <div className={wrapperClass}>
+      {/* Chart header — alleen in inline-modus (modal heeft eigen header met titel + knoppen) */}
+      {inlineMode && (
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <h4 className="font-semibold text-navy-700 text-sm">{chart.title}</h4>
+          <div className="flex items-center gap-1">
+            {/* Vergroten button */}
             <button
               onClick={() => setZoomed(true)}
               title="Vergroot grafiek"
@@ -134,43 +141,43 @@ export function ChartRenderer({
             >
               <Maximize2 size={13} />
             </button>
-          )}
-          {/* Download button */}
-          <button
-            onClick={handleDownload}
-            title="Download als PNG"
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
-          >
-            <Download size={13} />
-          </button>
-          {/* Pin button */}
-          {onPin && (
+            {/* Download button */}
             <button
-              onClick={handlePin}
-              disabled={pinState === "loading" || isPinned}
-              title={isPinned ? "Al gepind" : "Pin aan dashboard"}
-              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
-                pinState === "done" || isPinned
-                  ? "bg-emerald-50 text-emerald-600"
-                  : pinState === "loading"
-                  ? "bg-gray-50 text-gray-400"
-                  : "bg-navy-700/5 text-navy-700 hover:bg-navy-700/10"
-              }`}
+              onClick={handleDownload}
+              title="Download als PNG"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
             >
-              {pinState === "done" || isPinned ? (
-                <><Check size={11} /> Gepind</>
-              ) : pinState === "loading" ? (
-                <><Pin size={11} /> Pinnen...</>
-              ) : (
-                <><Pin size={11} /> Pin</>
-              )}
+              <Download size={13} />
             </button>
-          )}
+            {/* Pin button */}
+            {onPin && (
+              <button
+                onClick={handlePin}
+                disabled={pinState === "loading" || isPinned}
+                title={isPinned ? "Al gepind" : "Pin aan dashboard"}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
+                  pinState === "done" || isPinned
+                    ? "bg-emerald-50 text-emerald-600"
+                    : pinState === "loading"
+                    ? "bg-gray-50 text-gray-400"
+                    : "bg-navy-700/5 text-navy-700 hover:bg-navy-700/10"
+                }`}
+              >
+                {pinState === "done" || isPinned ? (
+                  <><Check size={11} /> Gepind</>
+                ) : pinState === "loading" ? (
+                  <><Pin size={11} /> Pinnen...</>
+                ) : (
+                  <><Pin size={11} /> Pin</>
+                )}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Chart */}
-      <div ref={chartRef} className="px-2 pb-4">
+      <div ref={chartRef} className={chartPadding}>
         <ResponsiveContainer width="100%" height={height}>
           {chart.type === "bar" ? (
             <BarChart data={chart.data}>
@@ -184,7 +191,7 @@ export function ChartRenderer({
                 }}
                 contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
               />
-              <Legend iconType="circle" iconSize={8} formatter={(value) => chart.keys.find(k => k.key === value)?.label ?? value} />
+              <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={(value) => chart.keys.find(k => k.key === value)?.label ?? value} />
               {chart.keys.map((k) => (
                 <Bar key={k.key} dataKey={k.key} fill={k.color} radius={[4, 4, 0, 0]} />
               ))}
@@ -201,7 +208,7 @@ export function ChartRenderer({
                 }}
                 contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
               />
-              <Legend iconType="circle" iconSize={8} formatter={(value) => chart.keys.find(k => k.key === value)?.label ?? value} />
+              <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={(value) => chart.keys.find(k => k.key === value)?.label ?? value} />
               {chart.keys.map((k) => (
                 <Line key={k.key} type="monotone" dataKey={k.key} stroke={k.color}
                   strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
@@ -283,7 +290,7 @@ export function ChartRenderer({
           </div>
 
           {/* Body — grote grafiek vult bijna hele modalbreedte */}
-          <div className="flex-1 overflow-auto p-8 bg-gray-50/30">
+          <div className="flex-1 overflow-auto px-6 py-4 bg-gray-50/30">
             <ChartRenderer chart={chart} height={500} allowZoom={false} question={question} />
           </div>
         </div>
