@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -47,16 +48,25 @@ export function ChartRenderer({
 }) {
   const [pinState, setPinState] = useState<"idle" | "loading" | "done">("idle");
   const [zoomed, setZoomed] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
 
-  // Esc om zoom modal te sluiten
+  // Portal target — pas na mount beschikbaar (SSR-safe)
+  useEffect(() => { setMounted(true); }, []);
+
+  // Esc om zoom modal te sluiten + body scroll lock
   useEffect(() => {
     if (!zoomed) return;
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setZoomed(false);
     }
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [zoomed]);
 
   if (chart.type === "none" || !chart.data?.length) return null;
@@ -217,21 +227,24 @@ export function ChartRenderer({
       </div>
     </div>
 
-    {/* Zoom modal — toont dezelfde grafiek op groot formaat */}
-    {zoomed && (
+    {/* Zoom modal — gerenderd via Portal direct naar document.body
+        zodat parent transforms (zoals chat-paneel translate-x) het niet beperken */}
+    {mounted && zoomed && createPortal(
       <div
-        className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-        style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+        className="fixed inset-0 z-[100] flex items-center justify-center p-6"
+        style={{ backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(2px)" }}
         onClick={() => setZoomed(false)}
+        role="dialog"
+        aria-modal="true"
       >
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+          className="bg-white rounded-2xl shadow-2xl w-[92vw] max-w-6xl max-h-[90vh] flex flex-col overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h3 className="font-bold text-navy-700 text-lg">{chart.title}</h3>
-            <div className="flex items-center gap-2">
+            <h3 className="font-bold text-navy-700 text-lg truncate pr-4">{chart.title}</h3>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={handleDownload}
                 title="Download als PNG"
@@ -269,12 +282,13 @@ export function ChartRenderer({
             </div>
           </div>
 
-          {/* Body — grote grafiek */}
-          <div className="flex-1 overflow-auto p-6">
-            <ChartRenderer chart={chart} height={460} allowZoom={false} question={question} />
+          {/* Body — grote grafiek vult bijna hele modalbreedte */}
+          <div className="flex-1 overflow-auto p-8 bg-gray-50/30">
+            <ChartRenderer chart={chart} height={500} allowZoom={false} question={question} />
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
     </>
   );
