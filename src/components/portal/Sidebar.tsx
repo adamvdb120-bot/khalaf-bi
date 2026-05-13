@@ -78,15 +78,15 @@ export default function Sidebar() {
             <div className="pt-4 pb-2 px-4">
               <span className="text-[10px] font-bold text-navy-400 uppercase tracking-widest">Admin</span>
             </div>
-            <Link href="/portal/admin"
+            <Link href="/portal/admin/klanten"
               className={cn(
                 "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-                pathname.startsWith("/portal/admin")
+                pathname.startsWith("/portal/admin/klanten") || pathname.startsWith("/portal/admin/klant-toevoegen")
                   ? "bg-gold-500 text-white shadow-md"
                   : "text-navy-200 hover:bg-navy-600 hover:text-white"
               )}>
               <ShieldCheck size={18} />
-              Klantenbeheer
+              Klanten
             </Link>
           </>
         )}
