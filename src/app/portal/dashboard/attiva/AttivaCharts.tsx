@@ -15,6 +15,8 @@ import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
 import ManagementSamenvatting from "@/components/portal/ManagementSamenvatting";
 import AINarratief from "@/components/portal/AINarratief";
 import ActiesMenu from "@/components/portal/ActiesMenu";
+import ChatSidePanel from "@/components/portal/ChatSidePanel";
+import { MessageSquare } from "lucide-react";
 import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
@@ -118,6 +120,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
   const [insightsForPresentation, setInsightsForPresentation] = useState<Array<{ titel: string; beschrijving: string; severity: "alarm" | "attention" | "positive" | "info"; type: string; cijfer?: string }>>([]);
   const [cacheStatus, setCacheStatus] = useState<"HIT" | "MISS" | null>(null);
   const [cacheAge, setCacheAge] = useState<number | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -469,10 +472,18 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         <div className="flex items-center gap-3">
           <CacheBadge cacheStatus={cacheStatus} ageSeconds={cacheAge} />
           {lastUpdated && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-400 hidden sm:inline">
               Bijgewerkt {lastUpdated.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
+          {/* Vraag je data — opent zij-paneel met AI chat */}
+          <button
+            onClick={() => setChatOpen(true)}
+            className="flex items-center gap-1.5 text-xs bg-navy-700 hover:bg-navy-600 text-white font-semibold rounded-lg px-3 py-1.5 transition-colors shadow-sm"
+          >
+            <MessageSquare size={12} />
+            Vraag je data
+          </button>
           <ActiesMenu
             onRefresh={() => load(jaar, true)}
             onPresentatie={() => setShowPresentation(true)}
@@ -939,15 +950,20 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         />
       )}
 
+      {/* Pinned charts blijven onderaan zichtbaar (resultaat van chat) */}
       {maandData.length > 0 && (
-        <>
-          <PinnedChartsSection tab="financieel" refresh={pinnedRefresh} />
+        <PinnedChartsSection tab="financieel" refresh={pinnedRefresh} />
+      )}
+
+      {/* Chat zit nu in het zij-paneel — altijd gemount zodat history bewaard blijft */}
+      {maandData.length > 0 && (
+        <ChatSidePanel open={chatOpen} onClose={() => setChatOpen(false)}>
           <DashboardChat
             context={chatContext}
             tab="financieel"
             onChartPinned={() => setPinnedRefresh(r => r + 1)}
           />
-        </>
+        </ChatSidePanel>
       )}
 
       {/* Presentation mode */}
