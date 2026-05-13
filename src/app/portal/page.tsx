@@ -16,13 +16,18 @@ export default async function PortalHomePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Profielcheck: admins blijven hier, klanten worden doorgestuurd
+  // Profielcheck: admins → command center, klanten → eigen dashboard
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, company, full_name")
       .eq("id", user.id)
       .single();
+
+    if (profile?.role === "admin") {
+      // Admins zien command center i.p.v. generic upload-dashboard
+      redirect("/portal/admin");
+    }
 
     if (profile?.role === "client") {
       const haystack = `${profile.company ?? ""} ${profile.full_name ?? ""} ${user.email ?? ""}`;
