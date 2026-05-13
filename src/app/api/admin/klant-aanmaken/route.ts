@@ -13,9 +13,16 @@ export async function POST(req: NextRequest) {
   if (profile?.role !== "admin")
     return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
-  const { email, password, full_name, company } = await req.json();
+  const { email, password, full_name, company, client_slug } = await req.json();
   if (!email || !password)
     return NextResponse.json({ error: "E-mail en wachtwoord zijn verplicht" }, { status: 400 });
+
+  // client_slug valideren — alleen toegestane waarden
+  const ALLOWED_SLUGS = ["attiva", "areys", "quba"];
+  const slug = (client_slug ?? "").toString().trim().toLowerCase();
+  if (slug && !ALLOWED_SLUGS.includes(slug)) {
+    return NextResponse.json({ error: `Onbekende client_slug: ${slug}` }, { status: 400 });
+  }
 
   const admin = createAdminClient();
 
@@ -29,12 +36,13 @@ export async function POST(req: NextRequest) {
   if (userError)
     return NextResponse.json({ error: userError.message }, { status: 400 });
 
-  // Maak profiel aan
+  // Maak profiel aan — met client_slug voor toegangscontrole
   await admin.from("profiles").insert({
     id: newUser.user.id,
     full_name: full_name || email.split("@")[0],
     company: company || "",
     role: "client",
+    client_slug: slug || null,
   });
 
   return NextResponse.json({ success: true, userId: newUser.user.id });

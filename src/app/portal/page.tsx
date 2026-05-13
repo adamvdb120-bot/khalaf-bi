@@ -5,34 +5,33 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Upload } from "lucide-react";
 
-// Routeer ingelogde klanten direct naar hun eigen dashboard
-const CLIENT_DASHBOARDS: { match: RegExp; href: string }[] = [
-  { match: /attiva/i, href: "/portal/dashboard/attiva" },
-  { match: /areys/i, href: "/portal/dashboard/areys" },
-  { match: /quba|markaz/i, href: "/portal/dashboard/markaz-quba" },
-];
+// Routeer ingelogde klanten via hun client_slug naar het juiste dashboard.
+// Geen fuzzy matching meer op naam — alleen exacte slug = veilig.
+const SLUG_TO_DASHBOARD: Record<string, string> = {
+  attiva: "/portal/dashboard/attiva",
+  areys: "/portal/dashboard/areys",
+  quba: "/portal/dashboard/markaz-quba",
+};
 
 export default async function PortalHomePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Profielcheck: admins → command center, klanten → eigen dashboard
+  // Profielcheck: admins → command center, klanten → hun eigen dashboard via slug
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, company, full_name")
+      .select("role, client_slug")
       .eq("id", user.id)
       .single();
 
     if (profile?.role === "admin") {
-      // Admins zien command center i.p.v. generic upload-dashboard
       redirect("/portal/admin");
     }
 
-    if (profile?.role === "client") {
-      const haystack = `${profile.company ?? ""} ${profile.full_name ?? ""} ${user.email ?? ""}`;
-      const match = CLIENT_DASHBOARDS.find((d) => d.match.test(haystack));
-      if (match) redirect(match.href);
+    if (profile?.role === "client" && profile.client_slug) {
+      const dashboardHref = SLUG_TO_DASHBOARD[profile.client_slug];
+      if (dashboardHref) redirect(dashboardHref);
     }
   }
 

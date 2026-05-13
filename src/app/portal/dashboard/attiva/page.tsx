@@ -1,14 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import AttivaTabs from "./AttivaTabs";
+import { requireClientAccess } from "@/lib/portal/access";
 
 export default async function AttivaDashboard() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // Vereist: admin of klant met client_slug='attiva'
+  const user = await requireClientAccess("attiva");
 
   const admin = createAdminClient();
   const { data: tokenRow } = await admin
@@ -21,9 +19,12 @@ export default async function AttivaDashboard() {
 
   return (
     <div className="space-y-8">
-      <Link href="/portal/admin" className="flex items-center gap-1 text-sm text-gray-400 hover:text-navy-700 transition-colors">
-        <ChevronLeft size={16} /> Terug naar klantenbeheer
-      </Link>
+      {/* Back-link alleen voor admins (klanten zien hun eigen dashboard direct) */}
+      {user.role === "admin" && (
+        <Link href="/portal/admin/klanten" className="flex items-center gap-1 text-sm text-gray-400 hover:text-navy-700 transition-colors">
+          <ChevronLeft size={16} /> Terug naar klanten
+        </Link>
+      )}
 
       {/* Header */}
       <div className="flex items-center gap-5">

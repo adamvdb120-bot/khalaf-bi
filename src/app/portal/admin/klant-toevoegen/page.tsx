@@ -5,13 +5,19 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, UserPlus, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
+const KLANT_OPTIES = [
+  { slug: "attiva", label: "Attiva Zorg" },
+  { slug: "areys", label: "Areys Restaurant" },
+  { slug: "quba", label: "Markaz Quba" },
+];
+
 export default function KlantToevoegenPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ email: "", password: "", full_name: "", company: "" });
+  const [form, setForm] = useState({ email: "", password: "", full_name: "", company: "", client_slug: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   }
 
@@ -32,15 +38,15 @@ export default function KlantToevoegenPage() {
       setStatus("error");
     } else {
       setStatus("done");
-      setTimeout(() => router.push("/portal/admin"), 1500);
+      setTimeout(() => router.push("/portal/admin/klanten"), 1500);
     }
   }
 
   return (
     <div className="max-w-lg">
-      <Link href="/portal/admin"
+      <Link href="/portal/admin/klanten"
         className="flex items-center gap-1 text-sm text-gray-400 hover:text-navy-700 mb-6 transition-colors">
-        <ChevronLeft size={16} /> Terug naar klantenbeheer
+        <ChevronLeft size={16} /> Terug naar klanten
       </Link>
 
       <h1 className="text-3xl font-bold text-navy-700 mb-1">Klant toevoegen</h1>
@@ -90,6 +96,29 @@ export default function KlantToevoegenPage() {
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700/20 focus:border-navy-700 transition"
             placeholder="Minimaal 8 tekens" />
           <p className="text-xs text-gray-400 mt-1">Deel dit wachtwoord veilig met uw klant.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Toegang tot dashboard *
+          </label>
+          <select
+            name="client_slug"
+            required
+            value={form.client_slug}
+            onChange={handleChange}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700/20 focus:border-navy-700 transition bg-white"
+          >
+            <option value="">— Kies een klantdashboard —</option>
+            {KLANT_OPTIES.map((k) => (
+              <option key={k.slug} value={k.slug}>
+                {k.label} ({k.slug})
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            Deze gebruiker krijgt <strong>alleen</strong> toegang tot het geselecteerde dashboard.
+          </p>
         </div>
 
         <button type="submit" disabled={status === "loading" || status === "done"}

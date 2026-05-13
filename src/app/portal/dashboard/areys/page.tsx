@@ -1,15 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import DashboardCharts from "@/components/portal/DashboardCharts";
 import DashboardChat from "@/components/portal/DashboardChat";
+import { requireClientAccess } from "@/lib/portal/access";
 
 export default async function AreysDashboard() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = await requireClientAccess("areys");
 
   const admin = createAdminClient();
 
@@ -30,9 +27,11 @@ export default async function AreysDashboard() {
 
   return (
     <div className="space-y-8">
-      <Link href="/portal/admin" className="flex items-center gap-1 text-sm text-gray-400 hover:text-navy-700 transition-colors">
-        <ChevronLeft size={16} /> Terug naar klantenbeheer
-      </Link>
+      {user.role === "admin" && (
+        <Link href="/portal/admin/klanten" className="flex items-center gap-1 text-sm text-gray-400 hover:text-navy-700 transition-colors">
+          <ChevronLeft size={16} /> Terug naar klanten
+        </Link>
+      )}
 
       <div className="flex items-center gap-5">
         <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-100 flex-shrink-0 flex items-center justify-center">
