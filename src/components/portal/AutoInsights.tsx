@@ -134,34 +134,28 @@ export default function AutoInsights({
   useEffect(() => { load(); }, [jaar]);
 
   return (
-    <div className="card relative overflow-hidden">
-      {/* Decoratieve gradient */}
-      <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br from-gold-500/10 to-navy-700/5 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="relative">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-navy-700 to-navy-600 flex items-center justify-center shadow-sm">
-              <Sparkles size={15} className="text-gold-400" />
-            </div>
-            <div>
-              <h3 className="font-bold text-navy-700">Smart Insights</h3>
-              <p className="text-[11px] text-gray-400">
-                AI-analyse van je cijfers
-                {data?.cached && data.age_seconds !== undefined && (
-                  <> · bijgewerkt {formatAge(data.age_seconds)}</>
-                )}
-              </p>
-            </div>
+    <div className="card">
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-bold text-navy-700 text-sm flex items-center gap-2">
+              <Sparkles size={13} className="text-navy-700" />
+              Actiepunten
+            </h3>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              AI-analyse van je cijfers
+              {data?.cached && data.age_seconds !== undefined && (
+                <> · {formatAge(data.age_seconds)}</>
+              )}
+            </p>
           </div>
           <button
             onClick={() => load(true)}
             disabled={refreshing}
-            title="Herbereken inzichten"
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 hover:border-navy-300 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+            title="Herbereken"
+            className="text-gray-300 hover:text-navy-700 disabled:opacity-50 transition-colors"
           >
             <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
-            Vernieuwen
           </button>
         </div>
 
@@ -184,39 +178,36 @@ export default function AutoInsights({
               const target = navigationTarget(ins);
               const clickable = !!(onNavigate && target);
 
-              // Compact = horizontale layout (icon links, content rechts), spaart verticale ruimte
+              // Compact = strakke lijst-row (geen grote gekleurde blokken meer)
               const cardContent = compact ? (
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
-                    <TypeIcon size={17} className={s.iconColor} />
-                  </div>
+                <div className="flex items-center gap-3 py-1">
+                  {/* Severity dot ipv groot blok */}
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    ins.severity === "alarm" ? "bg-red-500" :
+                    ins.severity === "attention" ? "bg-amber-500" :
+                    ins.severity === "positive" ? "bg-emerald-500" : "bg-blue-500"
+                  }`} />
+                  {/* Icon */}
+                  <TypeIcon size={14} className="text-gray-400 flex-shrink-0" />
+                  {/* Titel + beschrijving */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <h4 className={`font-bold text-sm leading-snug ${s.titleColor}`}>
-                        {ins.titel}
-                      </h4>
-                      <span className={`text-[9px] font-bold uppercase tracking-widest ${s.badgeBg} ${s.badgeText} px-1.5 py-0.5 rounded inline-flex items-center gap-1 flex-shrink-0`}>
-                        <SeverityIcon size={9} />
-                        {s.badge}
-                      </span>
-                    </div>
-                    {ins.cijfer && (
-                      <p className={`text-lg font-bold leading-tight mb-1 ${s.iconColor}`}>
-                        {ins.cijfer}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-700 leading-relaxed">
-                      {ins.beschrijving}
-                    </p>
-                    {clickable && (
-                      <div className="mt-2 flex items-center justify-end">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest ${s.iconColor} group-hover:gap-2 transition-all`}>
-                          Bekijk
-                          <ArrowUpRight size={11} />
-                        </span>
-                      </div>
-                    )}
+                    <p className="text-sm font-semibold text-navy-700 truncate">{ins.titel}</p>
+                    <p className="text-xs text-gray-500 truncate">{ins.beschrijving}</p>
                   </div>
+                  {/* Cijfer rechts */}
+                  {ins.cijfer && (
+                    <span className={`text-sm font-bold flex-shrink-0 ${
+                      ins.severity === "alarm" ? "text-red-600" :
+                      ins.severity === "attention" ? "text-amber-600" :
+                      ins.severity === "positive" ? "text-emerald-600" : "text-navy-700"
+                    }`}>
+                      {ins.cijfer}
+                    </span>
+                  )}
+                  {/* Klik-arrow */}
+                  {clickable && (
+                    <ArrowUpRight size={13} className="text-gray-300 group-hover:text-navy-700 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                  )}
                 </div>
               ) : (
                 <>
@@ -257,7 +248,7 @@ export default function AutoInsights({
               );
 
               const baseClass = compact
-                ? `${s.bg} ${s.border} border rounded-xl p-3.5 transition-all`
+                ? "px-3 py-2 rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
                 : `${s.bg} ${s.border} border rounded-xl p-4 flex flex-col gap-2.5 transition-all`;
 
               if (clickable && target) {
@@ -265,7 +256,7 @@ export default function AutoInsights({
                   <button
                     key={i}
                     onClick={() => onNavigate!(target.tab, target.section)}
-                    className={`group ${baseClass} text-left hover:shadow-md hover:-translate-y-0.5 cursor-pointer w-full`}
+                    className={`group ${baseClass} text-left cursor-pointer w-full`}
                   >
                     {cardContent}
                   </button>
@@ -273,7 +264,7 @@ export default function AutoInsights({
               }
 
               return (
-                <div key={i} className={`${baseClass} hover:shadow-sm`}>
+                <div key={i} className={`${baseClass}`}>
                   {cardContent}
                 </div>
               );
@@ -290,8 +281,25 @@ export default function AutoInsights({
 }
 
 function InsightsSkeleton({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="space-y-1">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-3 px-3 py-2 animate-pulse">
+            <div className="w-2 h-2 rounded-full bg-gray-200" />
+            <div className="h-3 w-3 bg-gray-200 rounded" />
+            <div className="flex-1 space-y-1">
+              <div className="h-3 bg-gray-200 rounded w-3/4" />
+              <div className="h-2 bg-gray-100 rounded w-1/2" />
+            </div>
+            <div className="h-3 w-12 bg-gray-200 rounded" />
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
-    <div className={compact ? "space-y-3" : "grid grid-cols-1 md:grid-cols-3 gap-3"}>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
       {[0, 1, 2].map((i) => (
         <div key={i} className="bg-gray-50 rounded-xl p-4 animate-pulse space-y-3">
           <div className="flex items-start justify-between">

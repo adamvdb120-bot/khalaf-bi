@@ -104,22 +104,18 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
     breakevenBuffer < -gemKostenPerMaand * 0.05 ? "onder" : "rand";
 
   return (
-    <div className="card relative overflow-hidden">
-      <div className="absolute -top-12 -right-12 w-40 h-40 bg-gold-500/8 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="relative">
+    <div className="card">
+      <div>
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-navy-700 to-navy-600 flex items-center justify-center shadow-sm">
-              <Briefcase size={15} className="text-gold-400" />
-            </div>
-            <div>
-              <h3 className="font-bold text-navy-700">Management samenvatting</h3>
-              <p className="text-[11px] text-gray-400">
-                {jaar} · gegevens t/m maand {aantalMaanden} · vergelijking met dezelfde periode {jaar - 1}
-              </p>
-            </div>
+          <div>
+            <h3 className="font-bold text-navy-700 flex items-center gap-2">
+              <Briefcase size={15} className="text-navy-700" />
+              Management samenvatting
+            </h3>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {jaar} · gegevens t/m maand {aantalMaanden} · vergelijking met dezelfde periode {jaar - 1}
+            </p>
           </div>
         </div>
 
@@ -241,21 +237,22 @@ function KpiTile({
   value: string;
   sub?: string;
   yoyPct: number | null;
-  yoyInverse?: boolean; // voor kosten: minder is beter
-  yoyAsPp?: boolean;    // toon delta als procentpunten ipv %
+  yoyInverse?: boolean;
+  yoyAsPp?: boolean;
   accent: "navy" | "gold" | "emerald" | "red";
 }) {
-  const accentBorder = {
-    navy: "border-t-navy-700",
-    gold: "border-t-gold-500",
-    emerald: "border-t-emerald-500",
-    red: "border-t-red-500",
+  // Alleen de waarde krijgt een subtiele kleur (geen luide borders)
+  const valueColor = {
+    navy: "text-navy-700",
+    gold: "text-navy-700",
+    emerald: "text-emerald-700",
+    red: "text-red-600",
   }[accent];
 
   return (
-    <div className={`rounded-xl border-t-4 ${accentBorder} bg-white border border-gray-100 p-3.5`}>
+    <div className="rounded-xl bg-white border border-gray-100 p-4">
       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">{label}</p>
-      <p className="text-xl font-bold text-navy-700 leading-tight">{value}</p>
+      <p className={`text-2xl font-bold leading-tight ${valueColor}`}>{value}</p>
       <div className="flex items-center justify-between gap-2 mt-2">
         {sub && <p className="text-[10px] text-gray-400 truncate">{sub}</p>}
         {yoyPct !== null && <YoyBadge value={yoyPct} inverse={yoyInverse} asPp={yoyAsPp} />}

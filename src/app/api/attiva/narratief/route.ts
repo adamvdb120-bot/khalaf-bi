@@ -8,8 +8,8 @@ interface PlRow { Amount: number; Description: string; Period: number; IsRevenue
 interface AgedRow { Name: string; Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number }
 
 export interface NarratiefResponse {
-  samenvatting: string;
-  punten: string[];
+  samenvatting: string;  // max 2 zinnen
+  aanbeveling: string;   // 1 concrete actie
   cached?: boolean;
   age_seconds?: number;
 }
@@ -139,31 +139,23 @@ URGENT CREDITEUREN (>90 dagen open):
 ${topUrgent.length > 0 ? `- Top: ${topUrgent.map(c => `${c.Name} (€${Math.round(c.Age90Plus ?? 0).toLocaleString("nl-NL")})`).join(", ")}` : ""}
 `.trim();
 
-  const prompt = `Je bent een financieel adviseur voor MKB-ondernemers. Schrijf een KORTE, VERHALENDE samenvatting van de financiële situatie in het Nederlands.
+  const prompt = `Je bent een financieel adviseur voor MKB-ondernemers. Schrijf een ULTRA-KORTE samenvatting van de financiële situatie in het Nederlands.
 
 DATA:
 ${dataSummary}
 
 REGELS:
-- 3 tot 5 zinnen, vlot en helder geschreven (geen lijstjes!).
-- Begin met de kern: hoe staat het bedrijf ervoor?
-- Noem de belangrijkste oorzaak van veranderingen (bv. "het resultaat daalt vooral door...").
-- Eindig met een korte actie of advies.
+- "samenvatting": MAX 2 zinnen. Wat is de kern van de situatie? Noem de hoofdoorzaak.
+- "aanbeveling": ÉÉN concrete actie die deze week genomen moet worden. Max 1 zin.
 - Gebruik concrete cijfers (euro's en percentages).
-- Schrijf alsof je tegen de ondernemer praat ("je omzet...", niet "de omzet...").
-- Wees realistisch — geen verkooppraat.
+- Spreek de ondernemer aan ("je omzet...", niet "de omzet...").
+- Geen verkooppraat. Geen lijstjes. Geen blabla.
 
 Geef ANTWOORD als JSON:
 {
-  "samenvatting": "De verhalende paragraaf hier...",
-  "punten": [
-    "Een kort kernpunt",
-    "Tweede kernpunt",
-    "Derde kernpunt"
-  ]
-}
-
-De "punten" zijn 3 ultra-korte bullet-style highlights (max 8 woorden elk) die naast de samenvatting komen.`;
+  "samenvatting": "Eerste zin met de kern. Tweede zin met de oorzaak.",
+  "aanbeveling": "Concrete actie deze week."
+}`;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -194,7 +186,7 @@ De "punten" zijn 3 ultra-korte bullet-style highlights (max 8 woorden elk) die n
   const aiJson = await aiRes.json();
   const content = aiJson.choices?.[0]?.message?.content ?? "{}";
 
-  let parsed: { samenvatting?: string; punten?: string[] };
+  let parsed: { samenvatting?: string; aanbeveling?: string };
   try {
     parsed = JSON.parse(content);
   } catch {
@@ -203,7 +195,7 @@ De "punten" zijn 3 ultra-korte bullet-style highlights (max 8 woorden elk) die n
 
   const result = {
     samenvatting: parsed.samenvatting ?? "Geen samenvatting beschikbaar.",
-    punten: (parsed.punten ?? []).slice(0, 3),
+    aanbeveling: parsed.aanbeveling ?? "",
   };
 
   await admin.from("exact_data_cache").upsert({

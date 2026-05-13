@@ -14,6 +14,7 @@ import ActivityFeed from "@/components/portal/ActivityFeed";
 import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
 import ManagementSamenvatting from "@/components/portal/ManagementSamenvatting";
 import AINarratief from "@/components/portal/AINarratief";
+import ActiesMenu from "@/components/portal/ActiesMenu";
 import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
@@ -469,25 +470,20 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           <CacheBadge cacheStatus={cacheStatus} ageSeconds={cacheAge} />
           {lastUpdated && (
             <span className="text-xs text-gray-400">
-              Bijgewerkt om {lastUpdated.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
+              Bijgewerkt {lastUpdated.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
-          <button onClick={() => load(jaar, true)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
-            <RefreshCw size={12} /> Vernieuwen
-          </button>
-          <button onClick={() => setShowPresentation(true)}
-            disabled={maandData.length === 0}
-            className="flex items-center gap-1.5 text-xs bg-navy-700 hover:bg-navy-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg px-3 py-1.5 transition-colors">
-            <Presentation size={12} /> Presentatie
-          </button>
-          <DownloadPDFButton
-            targetId="attiva-financieel-export"
-            filename={`Attiva-Zorg-Financieel-${jaar}`}
-            clientName="Attiva Zorg"
-            reportType="Financieel overzicht"
-            jaar={jaar}
-            label="PDF"
+          <ActiesMenu
+            onRefresh={() => load(jaar, true)}
+            onPresentatie={() => setShowPresentation(true)}
+            presentatieDisabled={maandData.length === 0}
+            pdf={{
+              targetId: "attiva-financieel-export",
+              filename: `Attiva-Zorg-Financieel-${jaar}`,
+              clientName: "Attiva Zorg",
+              reportType: "Financieel overzicht",
+              jaar,
+            }}
           />
         </div>
       </div>
@@ -503,10 +499,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
-      {/* AI Narratief — executive briefing bovenaan, eerste indruk */}
-      {maandData.length > 0 && <AINarratief jaar={data.jaar} />}
-
-      {/* Management samenvatting — harde cijfers met YoY */}
+      {/* 1. Management samenvatting — HOOFDSECTIE: harde cijfers met YoY */}
       {maandData.length > 0 && (
         <ManagementSamenvatting
           jaar={data.jaar}
@@ -514,6 +507,9 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           vorigPl={vorigData?.pl ?? []}
         />
       )}
+
+      {/* 2. AI conclusie — kleine kaart "wat betekent dit?" */}
+      {maandData.length > 0 && <AINarratief jaar={data.jaar} />}
 
       {/* Doelen voortgang — TIJDELIJK UITGESCHAKELD (debug)
       {maandData.length > 0 && (
@@ -526,28 +522,14 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
       */}
 
-      {/* Je briefing — Smart Insights + Activity Feed naast elkaar */}
+      {/* 3. Actiepunten — compacte lijst */}
       {maandData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-          <div className="lg:col-span-3">
-            <AutoInsights
-              jaar={data.jaar}
-              onNavigate={onNavigate}
-              onInsightsLoaded={setInsightsForPresentation}
-              compact
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <ActivityFeed
-              maandData={maandData}
-              vorigMaandData={vorigMaandData}
-              kostenPerCategorie={kostenPerCategorie}
-              omzetPerCategorie={omzetPerCategorie}
-              topCrediteuren={topCrediteuren}
-              jaar={data.jaar}
-            />
-          </div>
-        </div>
+        <AutoInsights
+          jaar={data.jaar}
+          onNavigate={onNavigate}
+          onInsightsLoaded={setInsightsForPresentation}
+          compact
+        />
       )}
 
       {/* KPI Cards */}
@@ -942,6 +924,18 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       </div>
+
+      {/* Activity Feed — lager op de pagina, niet de top-aandacht trekken */}
+      {maandData.length > 0 && (
+        <ActivityFeed
+          maandData={maandData}
+          vorigMaandData={vorigMaandData}
+          kostenPerCategorie={kostenPerCategorie}
+          omzetPerCategorie={omzetPerCategorie}
+          topCrediteuren={topCrediteuren}
+          jaar={data.jaar}
+        />
+      )}
 
       {maandData.length > 0 && (
         <>
