@@ -186,13 +186,19 @@ REGELS:
 - Geef alleen feiten uit de data, verzin niets
 - Wees concreet met bedragen en percentages
 - Eén insight = één onderwerp
+- "titel": kort onderwerp (bv. "Negatieve marge", "Urgente crediteuren", "Omzetconcentratie") — max 35 tekens
+- "beschrijving": EXACT ÉÉN korte actiezin in imperatieve stijl, begint met een werkwoord. Max 80 tekens. Geen uitleg of context — alleen wat te doen.
+  Voorbeelden:
+   - "Controleer welke kostenposten deze marge drukken."
+   - "Neem contact op met crediteuren ouder dan 90 dagen."
+   - "Onderzoek nieuwe inkomstenbronnen om concentratie te verlagen."
+- "cijfer": het kerncijfer (bv. "-5,0%", "€10.960")
 - WEES STRENG met severity:
-  - "alarm" = ALLEEN bij urgente, deze-week-actie (bv. crediteur >90 dagen €>5K openstaand, dreigend liquiditeitsprobleem). Gebruik dit MAX 1x.
-  - "attention" = aandachtswaardige trend (dalende marge, kostenstijging, concentratierisico). Default.
-  - "positive" = duidelijk goed nieuws (groei, gezonde marge, betaalde grote post).
-  - "info" = neutrale observatie zonder actie nodig.
-- Geef bij voorkeur: 1 attention/info + 1 positive (als er positief nieuws is) + 1 zinvolle. Niet alles alarm.
-- BESCHRIJVING max 80 tekens! Houd het kort.`;
+  - "alarm" = ALLEEN bij urgente, deze-week-actie. Max 1x in totaal.
+  - "attention" = aandachtswaardige trend (default).
+  - "positive" = duidelijk goed nieuws.
+  - "info" = neutrale observatie.
+- Mix: liever 1 attention + 1 positive + 1 attention dan alles alarm.`;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {

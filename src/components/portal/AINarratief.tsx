@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, RefreshCw, ArrowRight } from "lucide-react";
+import { Sparkles, RefreshCw } from "lucide-react";
 
 interface NarratiefData {
   samenvatting: string;
@@ -86,10 +86,10 @@ export default function AINarratief({ jaar }: { jaar: number }) {
                 {data.samenvatting}
               </p>
               {data.aanbeveling && (
-                <div className="mt-2.5 flex items-start gap-1.5 text-sm">
-                  <ArrowRight size={13} className="text-gold-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-navy-700 font-medium">{data.aanbeveling}</span>
-                </div>
+                <p className="mt-2 text-sm text-navy-700">
+                  <span className="font-bold text-gold-600">Actie:</span>{" "}
+                  <span>{data.aanbeveling}</span>
+                </p>
               )}
             </>
           )}

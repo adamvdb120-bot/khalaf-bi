@@ -178,35 +178,43 @@ export default function AutoInsights({
               const target = navigationTarget(ins);
               const clickable = !!(onNavigate && target);
 
-              // Compact = strakke 1-regel lijst (alleen titel + cijfer, geen beschrijving)
+              // Compact = taak-stijl: regel 1 = "Titel — cijfer", regel 2 = actie
+              const cijferKleur =
+                ins.severity === "alarm" ? "text-red-600" :
+                ins.severity === "attention" ? "text-amber-600" :
+                ins.severity === "positive" ? "text-emerald-600" : "text-navy-700";
+
               const cardContent = compact ? (
-                <div className="flex items-center gap-3">
-                  {/* Severity dot — alleen rood bij echte alarm */}
-                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                <div className="flex items-start gap-3">
+                  {/* Severity dot */}
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2 ${
                     ins.severity === "alarm" ? "bg-red-500" :
                     ins.severity === "attention" ? "bg-amber-500" :
                     ins.severity === "positive" ? "bg-emerald-500" : "bg-gray-400"
                   }`} />
                   {/* Icon */}
-                  <TypeIcon size={13} className="text-gray-400 flex-shrink-0" />
-                  {/* Titel — 1 regel */}
-                  <p className="text-sm text-navy-700 flex-1 min-w-0 truncate">
-                    <span className="font-semibold">{ins.titel}</span>
-                    <span className="text-gray-500"> — {ins.beschrijving}</span>
-                  </p>
-                  {/* Cijfer rechts — alleen rood voor echte alarm */}
-                  {ins.cijfer && (
-                    <span className={`text-sm font-bold flex-shrink-0 tabular-nums ${
-                      ins.severity === "alarm" ? "text-red-600" :
-                      ins.severity === "attention" ? "text-amber-600" :
-                      ins.severity === "positive" ? "text-emerald-600" : "text-navy-700"
-                    }`}>
-                      {ins.cijfer}
-                    </span>
-                  )}
+                  <TypeIcon size={13} className="text-gray-400 flex-shrink-0 mt-1" />
+                  {/* Content — 2 regels */}
+                  <div className="flex-1 min-w-0">
+                    {/* Regel 1: Titel — Cijfer */}
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-bold text-navy-700 truncate">
+                        {ins.titel}
+                      </p>
+                      {ins.cijfer && (
+                        <span className={`text-sm font-bold flex-shrink-0 tabular-nums ${cijferKleur}`}>
+                          {ins.cijfer}
+                        </span>
+                      )}
+                    </div>
+                    {/* Regel 2: Actie */}
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {ins.beschrijving}
+                    </p>
+                  </div>
                   {/* Klik-arrow */}
                   {clickable && (
-                    <ArrowUpRight size={12} className="text-gray-300 group-hover:text-navy-700 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                    <ArrowUpRight size={12} className="text-gray-300 group-hover:text-navy-700 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-1" />
                   )}
                 </div>
               ) : (

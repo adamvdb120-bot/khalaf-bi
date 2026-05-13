@@ -139,22 +139,30 @@ URGENT CREDITEUREN (>90 dagen open):
 ${topUrgent.length > 0 ? `- Top: ${topUrgent.map(c => `${c.Name} (€${Math.round(c.Age90Plus ?? 0).toLocaleString("nl-NL")})`).join(", ")}` : ""}
 `.trim();
 
-  const prompt = `Je bent een financieel adviseur voor MKB-ondernemers. Vat de financiële situatie samen in MAX 2 ZINNEN TOTAAL.
+  const prompt = `Je bent een financieel adviseur voor MKB-ondernemers. Schrijf een ULTRA-COMPACTE financiële update.
 
 DATA:
 ${dataSummary}
 
 REGELS:
-- "samenvatting": ÉÉN zin. Wat is de kern van de situatie + de hoofdoorzaak.
-- "aanbeveling": ÉÉN korte zin met concrete actie.
-- Gebruik concrete cijfers (euro's en percentages).
-- Spreek de ondernemer aan ("je omzet...", niet "de omzet...").
-- Wees direct. Geen blabla. Geen "Dit is een signaal dat..."
+- "samenvatting": EXACT 2 korte zinnen:
+  * Zin 1: De kern + de hoofdoorzaak met cijfers.
+  * Zin 2: Het effect (bv. winst/verlies/marge verschil).
+- "aanbeveling": ÉÉN imperatieve zin met een concrete actie (begin met werkwoord: "Onderzoek...", "Bel...", "Verlaag...", "Bekijk...").
+- Geen "Dit is een signaal dat...", geen "Het is essentieel om...", geen blabla.
+- Spreek de ondernemer aan ("je omzet...").
+- Concrete getallen.
 
-Geef ANTWOORD als JSON:
+Voorbeeld van goede output:
 {
-  "samenvatting": "Eén zin: kern + oorzaak.",
-  "aanbeveling": "Eén zin: concrete actie."
+  "samenvatting": "Je resultaat staat onder druk: omzet daalt 3,9% terwijl kosten 5,5% stijgen. Daardoor draait Attiva dit jaar een verlies van €33.642.",
+  "aanbeveling": "Onderzoek bruto loon, uitbesteed werk en brandstofkosten."
+}
+
+Geef ANTWOORD als JSON in dit exacte format:
+{
+  "samenvatting": "...",
+  "aanbeveling": "..."
 }`;
 
   const apiKey = process.env.GROQ_API_KEY;
