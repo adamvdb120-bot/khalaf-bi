@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Bell, AlertTriangle, AlertCircle, Info, Wallet, TrendingDown,
-  Plug, Database, X, ArrowRight,
+  Plug, Database, X, ArrowRight, Target, UserX,
 } from "lucide-react";
 
 interface Notification {
   id: string;
-  type: "crediteur" | "marge" | "exact" | "data" | "info";
+  type: "crediteur" | "marge" | "exact" | "data" | "info" | "budget" | "client";
   severity: "alarm" | "attention" | "info";
   titel: string;
   beschrijving: string;
@@ -24,6 +24,8 @@ const TYPE_ICONS = {
   exact: Plug,
   data: Database,
   info: Info,
+  budget: Target,
+  client: UserX,
 };
 
 export default function NotificationBell() {

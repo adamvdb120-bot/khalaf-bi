@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface Notification {
   id: string;
-  type: "crediteur" | "marge" | "exact" | "data" | "info";
+  type: "crediteur" | "marge" | "exact" | "data" | "info" | "budget" | "client";
   severity: "alarm" | "attention" | "info";
   titel: string;
   beschrijving: string;
@@ -177,6 +177,116 @@ export async function GET() {
         href: "/portal/dashboard/attiva",
         klant: "Attiva Zorg",
       });
+    }
+
+    // ─── Budget- en cliënt-checks op declaratiedata ────────────────────────
+    interface DeclRow { budgethouder: string | null; bedrag: number | null; status: string | null; periode: string | null }
+    interface BudgRow { budgethouder: string; budget: number }
+
+    const [declHuidigRes, declVorigRes, budgRes] = await Promise.all([
+      admin.from("attiva_declaraties")
+        .select("budgethouder, bedrag, status, periode")
+        .eq("jaar", huidigJaar)
+        .not("bedrag", "is", null),
+      admin.from("attiva_declaraties")
+        .select("budgethouder, bedrag, status, periode")
+        .eq("jaar", huidigJaar - 1)
+        .not("bedrag", "is", null),
+      admin.from("attiva_pgb_budgetten")
+        .select("budgethouder, budget")
+        .eq("jaar", huidigJaar),
+    ]);
+
+    const declHuidig = (declHuidigRes.data as DeclRow[] | null) ?? [];
+    const declVorig = (declVorigRes.data as DeclRow[] | null) ?? [];
+    const budgetten = (budgRes.data as BudgRow[] | null) ?? [];
+
+    // Aggregeer verbruik per budgethouder huidig jaar (alle periodes)
+    const verbruikHuidig: Record<string, number> = {};
+    let maxPeriode = 0;
+    for (const r of declHuidig) {
+      if (String(r.status ?? "").toLowerCase().includes("ingetrokken")) continue;
+      if (!r.bedrag || r.bedrag <= 0) continue;
+      const naam = r.budgethouder?.trim();
+      if (!naam) continue;
+      verbruikHuidig[naam] = (verbruikHuidig[naam] ?? 0) + r.bedrag;
+      // Track laatste maand met data — voor same-period vergelijking
+      if (r.periode) {
+        const m = parseInt(r.periode.slice(5, 7), 10);
+        if (!Number.isNaN(m) && m >= 1 && m <= 12) maxPeriode = Math.max(maxPeriode, m);
+      }
+    }
+
+    // Budget-alerts
+    const overBudget: { naam: string; over: number }[] = [];
+    const bijnaOpBudget: { naam: string; pct: number }[] = [];
+    for (const b of budgetten) {
+      if (!b.budgethouder || !b.budget || b.budget <= 0) continue;
+      const v = verbruikHuidig[b.budgethouder] ?? 0;
+      const pct = (v / b.budget) * 100;
+      if (pct >= 100) overBudget.push({ naam: b.budgethouder, over: v - b.budget });
+      else if (pct >= 90) bijnaOpBudget.push({ naam: b.budgethouder, pct });
+    }
+
+    if (overBudget.length > 0) {
+      const sorted = overBudget.sort((a, b) => b.over - a.over);
+      notifications.push({
+        id: `budget-over-${slug}`,
+        type: "budget",
+        severity: "alarm",
+        titel: `${overBudget.length} ${overBudget.length === 1 ? "cliënt is" : "cliënten zijn"} over budget`,
+        beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (+${euro(c.over)})`).join(", "),
+        href: "/portal/dashboard/attiva?tab=declaraties",
+        klant: "Attiva Zorg",
+      });
+    }
+
+    if (bijnaOpBudget.length > 0) {
+      const sorted = bijnaOpBudget.sort((a, b) => b.pct - a.pct);
+      notifications.push({
+        id: `budget-bijna-${slug}`,
+        type: "budget",
+        severity: "attention",
+        titel: `${bijnaOpBudget.length} ${bijnaOpBudget.length === 1 ? "cliënt" : "cliënten"} bijna op jaarbudget`,
+        beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (${c.pct.toFixed(0)}%)`).join(", "),
+        href: "/portal/dashboard/attiva?tab=declaraties",
+        klant: "Attiva Zorg",
+      });
+    }
+
+    // Cliënten weggevallen: significant vorig jaar (€10k+), nu bijna niets (<20%)
+    if (maxPeriode > 0 && declVorig.length > 0) {
+      const vorigSamePeriode: Record<string, number> = {};
+      for (const r of declVorig) {
+        if (String(r.status ?? "").toLowerCase().includes("ingetrokken")) continue;
+        if (!r.bedrag || r.bedrag <= 0) continue;
+        const naam = r.budgethouder?.trim();
+        if (!naam || !r.periode) continue;
+        const m = parseInt(r.periode.slice(5, 7), 10);
+        if (Number.isNaN(m) || m > maxPeriode) continue;
+        vorigSamePeriode[naam] = (vorigSamePeriode[naam] ?? 0) + r.bedrag;
+      }
+
+      const weggevallen: { naam: string; vorig: number }[] = [];
+      for (const [naam, vorig] of Object.entries(vorigSamePeriode)) {
+        const nu = verbruikHuidig[naam] ?? 0;
+        if (vorig >= 10000 && nu < vorig * 0.2) {
+          weggevallen.push({ naam, vorig });
+        }
+      }
+
+      if (weggevallen.length > 0) {
+        const sorted = weggevallen.sort((a, b) => b.vorig - a.vorig);
+        notifications.push({
+          id: `client-gone-${slug}`,
+          type: "client",
+          severity: "attention",
+          titel: `${weggevallen.length} ${weggevallen.length === 1 ? "cliënt lijkt" : "cliënten lijken"} weggevallen`,
+          beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (was ${euro(c.vorig)})`).join(", "),
+          href: "/portal/dashboard/attiva?tab=declaraties",
+          klant: "Attiva Zorg",
+        });
+      }
     }
   }
 
