@@ -5,7 +5,9 @@ import {
   ArrowUpRight, ArrowDownRight, Minus, TrendingUp, AlertTriangle,
   Scale, CheckCircle2, Briefcase, HelpCircle,
 } from "lucide-react";
-import WaaromModal, { type WaaromData, type WaaromOorzaak } from "./WaaromModal";
+import WaaromModal, { type WaaromData, type WaaromOorzaak, type WaaromSection } from "./WaaromModal";
+
+type WaaromMetric = "resultaat" | "omzet" | "kosten";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 
@@ -23,6 +25,10 @@ function pct(v: number) {
 }
 function euroAbs(v: number) {
   return `€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
+}
+function formatSigned(v: number) {
+  const sign = v < 0 ? "−" : v > 0 ? "+" : "";
+  return `${sign}€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
 }
 
 // Aggregate pl rows to totals
@@ -50,7 +56,7 @@ function categoriesByPl(pl: PlRow[], isRevenue: boolean, periodeLimit?: number) 
 }
 
 export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
-  const [waaromOpen, setWaaromOpen] = useState(false);
+  const [waaromOpen, setWaaromOpen] = useState<WaaromMetric | null>(null);
 
   // Huidige jaar totalen
   const huidig = sumPl(pl);
@@ -111,71 +117,150 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
     breakevenBuffer > gemKostenPerMaand * 0.05 ? "boven" :
     breakevenBuffer < -gemKostenPerMaand * 0.05 ? "onder" : "rand";
 
-  // ─── Waarom-drilldown data voor het Resultaat KPI ────────────────────────────
+  // ─── Waarom-drilldown data voor Resultaat / Omzet / Kosten ──────────────────
   // We bouwen pas zinvolle data als er ook een vorige periode is om mee te vergelijken.
-  const waaromData = useMemo<WaaromData | null>(() => {
-    if (vorigSamePeriod.omzet === 0 && vorigSamePeriod.kosten === 0) return null;
+  const heeftVorigeData = vorigSamePeriod.omzet > 0 || vorigSamePeriod.kosten > 0;
+  const periodeLabel = `Vergelijking: ${jaar} (t/m maand ${aantalMaanden}) vs zelfde periode ${jaar - 1}`;
+
+  // Hulp-helpers om oorzaak-lijstjes te bouwen
+  function topOorzaken(
+    bron: { name: string; nu: number; vorig: number; delta: number }[],
+    richting: "stijgers" | "dalers",
+    limit = 3
+  ): WaaromOorzaak[] {
+    const gefilterd = richting === "stijgers"
+      ? bron.filter(a => a.delta > 0).sort((a, b) => b.delta - a.delta)
+      : bron.filter(a => a.delta < 0).sort((a, b) => a.delta - b.delta);
+    return gefilterd.slice(0, limit).map(a => ({
+      name: a.name, delta: a.delta, vorig: a.vorig, nu: a.nu,
+    }));
+  }
+
+  // ─── Resultaat ──────────────────────────────────────────────────────────────
+  const resultaatWaarom = useMemo<WaaromData | null>(() => {
+    if (!heeftVorigeData) return null;
 
     const omzetDelta = huidig.omzet - vorigSamePeriod.omzet;
     const kostenDelta = huidig.kosten - vorigSamePeriod.kosten;
     const netDelta = huidig.marge - vorigSamePeriod.marge;
 
-    // Top 3 kostenposten die zijn gestegen (positieve delta = slechter voor resultaat)
-    const topKostenStijgers: WaaromOorzaak[] = kostenAfwijkingen
-      .filter(a => a.delta > 0)
-      .sort((a, b) => b.delta - a.delta)
-      .slice(0, 3)
-      .map(a => ({ name: a.name, delta: a.delta, vorig: a.vorig, nu: a.nu }));
+    // v1: bij verslechtering tonen we kostenstijgers + omzetdalers (de "schade-posten").
+    // Bij verbetering blijft dezelfde lijst zichtbaar (asymmetrie bewust geparkeerd).
+    const topKostenStijgers = topOorzaken(kostenAfwijkingen, "stijgers");
+    const topOmzetDalers = topOorzaken(omzetAfwijkingen, "dalers");
 
-    // Top 3 omzetposten die zijn gedaald (negatieve delta = slechter voor resultaat)
-    const topOmzetDalers: WaaromOorzaak[] = omzetAfwijkingen
-      .filter(a => a.delta < 0)
-      .sort((a, b) => a.delta - b.delta)
-      .slice(0, 3)
-      .map(a => ({ name: a.name, delta: a.delta, vorig: a.vorig, nu: a.nu }));
-
-    // ─── Conclusie-zin opbouwen ────────────────────────────────────────────────
     const isVerslechtering = netDelta < 0;
     const richting = isVerslechtering ? "gedaald" : "gestegen";
-
-    // Welk effect domineert: omzet, kosten, of beide?
-    const omzetEffect = -omzetDelta;   // negatieve omzet-delta drukt resultaat → omslaan voor "schade"
-    const kostenEffect = kostenDelta;  // positieve kosten-delta drukt resultaat
+    const omzetEffect = -omzetDelta;
+    const kostenEffect = kostenDelta;
     const totaalSchade = Math.abs(omzetEffect) + Math.abs(kostenEffect);
 
     let hoofdoorzaak = "";
     if (totaalSchade > 0) {
-      const omzetAandeel = Math.abs(omzetEffect) / totaalSchade;
       const kostenAandeel = Math.abs(kostenEffect) / totaalSchade;
+      const omzetAandeel = Math.abs(omzetEffect) / totaalSchade;
       if (kostenAandeel > 0.7) hoofdoorzaak = "vooral hogere kosten";
       else if (omzetAandeel > 0.7) hoofdoorzaak = "vooral lagere omzet";
       else hoofdoorzaak = "een combinatie van hogere kosten en lagere omzet";
     }
-
-    // Concrete oorzaken benoemen (1e kostenstijger, 1e omzetdaler)
     const concretePunten: string[] = [];
-    if (topKostenStijgers[0]) {
-      concretePunten.push(`${topKostenStijgers[0].name} steeg met ${euroAbs(topKostenStijgers[0].delta)}`);
-    }
-    if (topOmzetDalers[0]) {
-      concretePunten.push(`${topOmzetDalers[0].name} daalde met ${euroAbs(topOmzetDalers[0].delta)}`);
-    }
+    if (topKostenStijgers[0]) concretePunten.push(`${topKostenStijgers[0].name} steeg met ${euroAbs(topKostenStijgers[0].delta)}`);
+    if (topOmzetDalers[0]) concretePunten.push(`${topOmzetDalers[0].name} daalde met ${euroAbs(topOmzetDalers[0].delta)}`);
 
     const conclusie = isVerslechtering
       ? `Het resultaat is ${richting} met ${euroAbs(netDelta)} t.o.v. dezelfde periode vorig jaar — ${hoofdoorzaak || "geen duidelijke hoofdoorzaak op postniveau"}.${concretePunten.length > 0 ? ` De grootste posten: ${concretePunten.join(" en ")}.` : ""}`
       : `Het resultaat is ${richting} met ${euroAbs(netDelta)} t.o.v. dezelfde periode vorig jaar.${concretePunten.length > 0 ? ` Belangrijke verschuivingen: ${concretePunten.join(" en ")}.` : ""}`;
 
+    const sections: WaaromSection[] = [
+      { label: "Grootste kostenstijgers", iconDirection: "up", tone: "red", oorzaken: topKostenStijgers },
+      { label: "Grootste omzetdalers", iconDirection: "down", tone: "amber", oorzaken: topOmzetDalers },
+    ];
+
     return {
       titel: `Waarom is je resultaat ${richting}?`,
-      periode: `Vergelijking: ${jaar} (t/m maand ${aantalMaanden}) vs zelfde periode ${jaar - 1}`,
-      netDelta,
-      omzetDelta,
-      kostenDelta,
-      topKostenStijgers,
-      topOmzetDalers,
+      periode: periodeLabel,
+      hoofdMetric: {
+        label: "Netto-effect",
+        waarde: netDelta,
+        uitleg: `Opgebouwd uit ${formatSigned(omzetDelta)} omzet en ${formatSigned(-kostenDelta)} kosten-effect (kosten zijn omgekeerd: een stijging drukt het resultaat).`,
+        isPositief: netDelta >= 0,
+      },
+      sections,
       conclusie,
     };
-  }, [jaar, aantalMaanden, huidig.omzet, huidig.kosten, huidig.marge, vorigSamePeriod, kostenAfwijkingen, omzetAfwijkingen]);
+  }, [heeftVorigeData, huidig.omzet, huidig.kosten, huidig.marge, vorigSamePeriod, kostenAfwijkingen, omzetAfwijkingen, periodeLabel]);
+
+  // ─── Omzet ──────────────────────────────────────────────────────────────────
+  const omzetWaarom = useMemo<WaaromData | null>(() => {
+    if (!heeftVorigeData || vorigSamePeriod.omzet === 0) return null;
+
+    const omzetDelta = huidig.omzet - vorigSamePeriod.omzet;
+    const isStijging = omzetDelta >= 0;
+    const richting = isStijging ? "gestegen" : "gedaald";
+
+    const sectie: WaaromSection = isStijging
+      ? { label: "Grootste omzetstijgers", iconDirection: "up", tone: "emerald", oorzaken: topOorzaken(omzetAfwijkingen, "stijgers") }
+      : { label: "Grootste omzetdalers", iconDirection: "down", tone: "amber", oorzaken: topOorzaken(omzetAfwijkingen, "dalers") };
+
+    const concreet = sectie.oorzaken
+      .slice(0, 2)
+      .map(o => `${o.name} ${isStijging ? "steeg" : "daalde"} met ${euroAbs(o.delta)}`)
+      .join(" en ");
+
+    const conclusie = `Je omzet is ${richting} met ${euroAbs(omzetDelta)} t.o.v. dezelfde periode vorig jaar.${concreet ? ` Grootste ${isStijging ? "bijdragen" : "verliezen"}: ${concreet}.` : " Geen materiele verschuivingen op postniveau."}`;
+
+    return {
+      titel: `Waarom is je omzet ${richting}?`,
+      periode: periodeLabel,
+      hoofdMetric: {
+        label: "Omzet-effect",
+        waarde: omzetDelta,
+        isPositief: isStijging,
+      },
+      sections: [sectie],
+      conclusie,
+    };
+  }, [heeftVorigeData, huidig.omzet, vorigSamePeriod, omzetAfwijkingen, periodeLabel]);
+
+  // ─── Kosten ─────────────────────────────────────────────────────────────────
+  const kostenWaarom = useMemo<WaaromData | null>(() => {
+    if (!heeftVorigeData || vorigSamePeriod.kosten === 0) return null;
+
+    const kostenDelta = huidig.kosten - vorigSamePeriod.kosten;
+    const isStijging = kostenDelta > 0;
+    const richting = isStijging ? "gestegen" : "gedaald";
+
+    const sectie: WaaromSection = isStijging
+      ? { label: "Grootste kostenstijgers", iconDirection: "up", tone: "red", oorzaken: topOorzaken(kostenAfwijkingen, "stijgers") }
+      : { label: "Grootste kostendalers", iconDirection: "down", tone: "emerald", oorzaken: topOorzaken(kostenAfwijkingen, "dalers") };
+
+    const concreet = sectie.oorzaken
+      .slice(0, 2)
+      .map(o => `${o.name} ${isStijging ? "steeg" : "daalde"} met ${euroAbs(o.delta)}`)
+      .join(" en ");
+
+    const conclusie = `Je kosten zijn ${richting} met ${euroAbs(kostenDelta)} t.o.v. dezelfde periode vorig jaar.${concreet ? ` Grootste ${isStijging ? "stijgers" : "besparingen"}: ${concreet}.` : " Geen materiele verschuivingen op postniveau."}`;
+
+    return {
+      titel: `Waarom zijn je kosten ${richting}?`,
+      periode: periodeLabel,
+      hoofdMetric: {
+        label: "Kosten-effect",
+        waarde: kostenDelta,
+        // Kosten omlaag is positief nieuws; kosten omhoog is negatief nieuws.
+        isPositief: !isStijging,
+      },
+      sections: [sectie],
+      conclusie,
+    };
+  }, [heeftVorigeData, huidig.kosten, vorigSamePeriod, kostenAfwijkingen, periodeLabel]);
+
+  // Welke WaaromData hoort bij de momenteel geopende metric?
+  const activeWaarom: WaaromData | null =
+    waaromOpen === "resultaat" ? resultaatWaarom :
+    waaromOpen === "omzet" ? omzetWaarom :
+    waaromOpen === "kosten" ? kostenWaarom :
+    null;
 
   return (
     <div className="card">
@@ -201,6 +286,7 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
             sub={vorigSamePeriod.omzet > 0 ? `Vorig jaar: ${euro(vorigSamePeriod.omzet)}` : undefined}
             yoyPct={yoyOmzet}
             accent="navy"
+            onWaarom={omzetWaarom ? () => setWaaromOpen("omzet") : undefined}
           />
           <KpiTile
             label="Kosten YTD"
@@ -209,6 +295,7 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
             yoyPct={yoyKosten}
             yoyInverse
             accent="gold"
+            onWaarom={kostenWaarom ? () => setWaaromOpen("kosten") : undefined}
           />
           <KpiTile
             label="Resultaat YTD"
@@ -216,7 +303,7 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
             sub={vorigSamePeriod.marge !== 0 ? `Vorig jaar: ${euro(vorigSamePeriod.marge)}` : undefined}
             yoyPct={yoyMarge}
             accent={huidig.marge >= 0 ? "emerald" : "red"}
-            onWaarom={waaromData ? () => setWaaromOpen(true) : undefined}
+            onWaarom={resultaatWaarom ? () => setWaaromOpen("resultaat") : undefined}
           />
           <KpiTile
             label="Brutomarge"
@@ -301,8 +388,12 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
         </div>
       </div>
 
-      {/* Waarom-modal — alleen gemount als er data is */}
-      <WaaromModal open={waaromOpen} onClose={() => setWaaromOpen(false)} data={waaromData} />
+      {/* Waarom-modal — één modal voor 3 metrics; data wisselt per geopende KPI */}
+      <WaaromModal
+        open={waaromOpen !== null}
+        onClose={() => setWaaromOpen(null)}
+        data={activeWaarom}
+      />
     </div>
   );
 }

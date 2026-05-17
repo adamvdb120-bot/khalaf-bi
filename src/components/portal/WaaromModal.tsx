@@ -5,20 +5,33 @@ import { X, TrendingDown, TrendingUp, ArrowDown, ArrowUp } from "lucide-react";
 
 export interface WaaromOorzaak {
   name: string;
-  delta: number;   // bedrag (€), teken volgt de KPI-richting
+  delta: number;   // bedrag (€); teken volgt de werkelijke richting van de post
   vorig: number;
   nu: number;
 }
 
+export type WaaromTone = "red" | "amber" | "emerald" | "navy";
+
+export interface WaaromSection {
+  label: string;                          // bv. "Grootste kostenstijgers"
+  iconDirection: "up" | "down";           // pijl-richting van het icoon
+  tone: WaaromTone;                       // accent-kleur van de sectie
+  oorzaken: WaaromOorzaak[];              // gesorteerd op relevantie
+}
+
+export interface WaaromHoofdMetric {
+  label: string;            // bv. "Netto-effect", "Omzet-effect"
+  waarde: number;           // bv. +53035 of -37366
+  uitleg?: string;          // optionele tweede regel (bv. breakdown voor Resultaat)
+  isPositief: boolean;      // bepaalt groen vs rood vs neutraal
+}
+
 export interface WaaromData {
-  titel: string;                // "Waarom is je resultaat gedaald?" / "...gestegen?"
-  periode: string;              // bv. "vs zelfde periode 2024"
-  netDelta: number;             // bv. -62.764 (negatief = verslechterd voor resultaat)
-  omzetDelta: number;           // bv. -26.770
-  kostenDelta: number;          // bv. +36.244 (positief = meer kosten = slechter voor resultaat)
-  topKostenStijgers: WaaromOorzaak[];   // delta > 0, gesorteerd desc
-  topOmzetDalers: WaaromOorzaak[];      // delta < 0, gesorteerd asc (meest negatief eerst)
-  conclusie: string;            // 1-2 zinnen klare-taal samenvatting
+  titel: string;                       // bv. "Waarom is je resultaat gedaald?"
+  periode: string;                     // bv. "Vergelijking: 2025 (t/m maand 12) vs zelfde periode 2024"
+  hoofdMetric?: WaaromHoofdMetric;     // optioneel; bij Resultaat verklarend, bij Omzet/Kosten cijfer-zelf
+  sections: WaaromSection[];           // 0..N oorzaak-secties
+  conclusie: string;                   // 1-2 zinnen klare-taal samenvatting
 }
 
 interface Props {
@@ -38,7 +51,6 @@ function euroAbs(v: number) {
 }
 
 export default function WaaromModal({ open, onClose, data }: Props) {
-  // Close on Esc
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
@@ -50,7 +62,8 @@ export default function WaaromModal({ open, onClose, data }: Props) {
 
   if (!open || !data) return null;
 
-  const isVerslechtering = data.netDelta < 0;
+  // Header-icon op basis van hoofdMetric (fallback naar neutraal)
+  const headerIsPositief = data.hoofdMetric?.isPositief ?? true;
 
   return (
     <div
@@ -65,10 +78,10 @@ export default function WaaromModal({ open, onClose, data }: Props) {
         <div className="flex items-start justify-between px-6 py-5 border-b border-gray-100">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              {isVerslechtering ? (
-                <TrendingDown size={16} className="text-red-600" />
-              ) : (
+              {headerIsPositief ? (
                 <TrendingUp size={16} className="text-emerald-600" />
+              ) : (
+                <TrendingDown size={16} className="text-red-600" />
               )}
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                 Waarom-analyse
@@ -88,56 +101,50 @@ export default function WaaromModal({ open, onClose, data }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-          {/* Netto-effect blok */}
-          <div className={`rounded-xl border p-4 ${
-            isVerslechtering ? "border-red-100 bg-red-50/40" : "border-emerald-100 bg-emerald-50/40"
-          }`}>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">
-              Netto-effect
-            </p>
-            <p className={`text-2xl font-bold ${isVerslechtering ? "text-red-700" : "text-emerald-700"}`}>
-              {euro(data.netDelta)}
-            </p>
-            <p className="text-xs text-gray-600 mt-2">
-              Opgebouwd uit{" "}
-              <strong>{euro(data.omzetDelta)}</strong> omzet en{" "}
-              <strong>{euro(-data.kostenDelta)}</strong> kosten-effect
-              <span className="text-gray-400"> (kosten zijn omgekeerd: een stijging drukt het resultaat)</span>
-            </p>
-          </div>
-
-          {/* Top kostenstijgers */}
-          {data.topKostenStijgers.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <ArrowUp size={13} className="text-red-600" />
-                <h3 className="text-sm font-bold text-navy-700">Grootste kostenstijgers</h3>
-              </div>
-              <div className="space-y-2">
-                {data.topKostenStijgers.map((o, i) => (
-                  <OorzaakRij key={o.name} rank={i + 1} oorzaak={o} kleur="red" />
-                ))}
-              </div>
+          {/* HoofdMetric block (optioneel) */}
+          {data.hoofdMetric && (
+            <div className={`rounded-xl border p-4 ${
+              data.hoofdMetric.isPositief
+                ? "border-emerald-100 bg-emerald-50/40"
+                : "border-red-100 bg-red-50/40"
+            }`}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">
+                {data.hoofdMetric.label}
+              </p>
+              <p className={`text-2xl font-bold ${
+                data.hoofdMetric.isPositief ? "text-emerald-700" : "text-red-700"
+              }`}>
+                {euro(data.hoofdMetric.waarde)}
+              </p>
+              {data.hoofdMetric.uitleg && (
+                <p className="text-xs text-gray-600 mt-2">{data.hoofdMetric.uitleg}</p>
+              )}
             </div>
           )}
 
-          {/* Top omzetdalers */}
-          {data.topOmzetDalers.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <ArrowDown size={13} className="text-amber-600" />
-                <h3 className="text-sm font-bold text-navy-700">Grootste omzetdalers</h3>
+          {/* Secties */}
+          {data.sections.map((section, idx) => (
+            section.oorzaken.length > 0 && (
+              <div key={`${section.label}-${idx}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  {section.iconDirection === "up" ? (
+                    <ArrowUp size={13} className={iconColorClass(section.tone)} />
+                  ) : (
+                    <ArrowDown size={13} className={iconColorClass(section.tone)} />
+                  )}
+                  <h3 className="text-sm font-bold text-navy-700">{section.label}</h3>
+                </div>
+                <div className="space-y-2">
+                  {section.oorzaken.map((o, i) => (
+                    <OorzaakRij key={o.name} rank={i + 1} oorzaak={o} tone={section.tone} />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                {data.topOmzetDalers.map((o, i) => (
-                  <OorzaakRij key={o.name} rank={i + 1} oorzaak={o} kleur="amber" />
-                ))}
-              </div>
-            </div>
-          )}
+            )
+          ))}
 
-          {/* Geen materiele oorzaken */}
-          {data.topKostenStijgers.length === 0 && data.topOmzetDalers.length === 0 && (
+          {/* Geen secties met inhoud → fallback */}
+          {data.sections.every(s => s.oorzaken.length === 0) && (
             <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 text-center">
               <p className="text-sm text-gray-500">
                 Geen materiele afwijkingen op postniveau gevonden voor deze periode.
@@ -168,17 +175,38 @@ export default function WaaromModal({ open, onClose, data }: Props) {
   );
 }
 
+function iconColorClass(tone: WaaromTone): string {
+  switch (tone) {
+    case "red": return "text-red-600";
+    case "amber": return "text-amber-600";
+    case "emerald": return "text-emerald-600";
+    case "navy": return "text-navy-700";
+  }
+}
+
 function OorzaakRij({
   rank,
   oorzaak,
-  kleur,
+  tone,
 }: {
   rank: number;
   oorzaak: WaaromOorzaak;
-  kleur: "red" | "amber";
+  tone: WaaromTone;
 }) {
-  const deltaColor = kleur === "red" ? "text-red-700" : "text-amber-700";
-  const rankBg = kleur === "red" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700";
+  const deltaColor = {
+    red: "text-red-700",
+    amber: "text-amber-700",
+    emerald: "text-emerald-700",
+    navy: "text-navy-700",
+  }[tone];
+
+  const rankBg = {
+    red: "bg-red-100 text-red-700",
+    amber: "bg-amber-100 text-amber-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+    navy: "bg-navy-700/10 text-navy-700",
+  }[tone];
+
   const pct = oorzaak.vorig > 0 ? (oorzaak.delta / oorzaak.vorig) * 100 : null;
 
   return (
