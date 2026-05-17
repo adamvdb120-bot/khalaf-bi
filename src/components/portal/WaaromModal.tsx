@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { X, TrendingDown, TrendingUp, ArrowDown, ArrowUp } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { X, TrendingDown, TrendingUp, ArrowDown, ArrowUp, ChevronDown, ChevronUp } from "lucide-react";
 
 export interface WaaromOorzaak {
   name: string;
@@ -17,6 +17,12 @@ export interface WaaromSection {
   iconDirection: "up" | "down";           // pijl-richting van het icoon
   tone: WaaromTone;                       // accent-kleur van de sectie
   oorzaken: WaaromOorzaak[];              // gesorteerd op relevantie
+  /**
+   * Optioneel: maakt elke oorzaak-rij uitklapbaar (chevron-icoon). Bij klik
+   * roept de modal deze functie aan om de detail-inhoud onder de rij te
+   * renderen — bv. een lazy-fetched cliënt-drilldown.
+   */
+  expandRenderer?: (oorzaak: WaaromOorzaak) => ReactNode;
 }
 
 export interface WaaromHoofdMetric {
@@ -136,7 +142,13 @@ export default function WaaromModal({ open, onClose, data }: Props) {
                 </div>
                 <div className="space-y-2">
                   {section.oorzaken.map((o, i) => (
-                    <OorzaakRij key={o.name} rank={i + 1} oorzaak={o} tone={section.tone} />
+                    <OorzaakRij
+                      key={o.name}
+                      rank={i + 1}
+                      oorzaak={o}
+                      tone={section.tone}
+                      expandRenderer={section.expandRenderer}
+                    />
                   ))}
                 </div>
               </div>
@@ -188,11 +200,16 @@ function OorzaakRij({
   rank,
   oorzaak,
   tone,
+  expandRenderer,
 }: {
   rank: number;
   oorzaak: WaaromOorzaak;
   tone: WaaromTone;
+  expandRenderer?: (o: WaaromOorzaak) => ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const isExpandable = !!expandRenderer;
+
   const deltaColor = {
     red: "text-red-700",
     amber: "text-amber-700",
@@ -209,29 +226,44 @@ function OorzaakRij({
 
   const pct = oorzaak.vorig > 0 ? (oorzaak.delta / oorzaak.vorig) * 100 : null;
 
+  const RowEl = isExpandable ? "button" : "div";
+
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-white border border-gray-100 p-3">
-      <div className={`w-6 h-6 rounded-full ${rankBg} text-[11px] font-bold flex items-center justify-center flex-shrink-0`}>
-        {rank}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-navy-700 truncate" title={oorzaak.name}>
-          {oorzaak.name}
-        </p>
-        <p className="text-[11px] text-gray-500 mt-0.5">
-          Was {euroAbs(oorzaak.vorig)} → nu {euroAbs(oorzaak.nu)}
-        </p>
-      </div>
-      <div className="text-right flex-shrink-0">
-        <p className={`text-sm font-bold ${deltaColor}`}>
-          {euro(oorzaak.delta)}
-        </p>
-        {pct !== null && (
-          <p className="text-[10px] text-gray-400 mt-0.5">
-            {pct >= 0 ? "+" : ""}{pct.toFixed(0)}%
+    <div>
+      <RowEl
+        onClick={isExpandable ? () => setExpanded((v) => !v) : undefined}
+        className={`w-full flex items-center gap-3 rounded-lg bg-white border border-gray-100 p-3 text-left ${
+          isExpandable ? "hover:border-navy-200 hover:bg-gray-50 transition-colors cursor-pointer" : ""
+        }`}
+      >
+        <div className={`w-6 h-6 rounded-full ${rankBg} text-[11px] font-bold flex items-center justify-center flex-shrink-0`}>
+          {rank}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-navy-700 truncate" title={oorzaak.name}>
+            {oorzaak.name}
           </p>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Was {euroAbs(oorzaak.vorig)} → nu {euroAbs(oorzaak.nu)}
+          </p>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className={`text-sm font-bold ${deltaColor}`}>
+            {euro(oorzaak.delta)}
+          </p>
+          {pct !== null && (
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              {pct >= 0 ? "+" : ""}{pct.toFixed(0)}%
+            </p>
+          )}
+        </div>
+        {isExpandable && (
+          <div className="flex-shrink-0 ml-1 text-gray-400">
+            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </div>
         )}
-      </div>
+      </RowEl>
+      {isExpandable && expanded && expandRenderer && expandRenderer(oorzaak)}
     </div>
   );
 }

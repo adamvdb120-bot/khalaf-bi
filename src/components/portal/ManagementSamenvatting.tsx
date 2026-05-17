@@ -6,6 +6,7 @@ import {
   Scale, CheckCircle2, Briefcase, HelpCircle,
 } from "lucide-react";
 import WaaromModal, { type WaaromData, type WaaromOorzaak, type WaaromSection } from "./WaaromModal";
+import ClientOmzetDrilldown from "./ClientOmzetDrilldown";
 
 type WaaromMetric = "resultaat" | "omzet" | "kosten";
 
@@ -198,16 +199,27 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
     const isStijging = omzetDelta >= 0;
     const richting = isStijging ? "gestegen" : "gedaald";
 
+    // Cliënt-drilldown renderer: per omzetcategorie kan de gebruiker doorklikken
+    // naar de cliënten binnen die categorie. Lazy fetch in ClientOmzetDrilldown.
+    const expandRenderer = (o: WaaromOorzaak) => (
+      <ClientOmzetDrilldown
+        categorie={o.name}
+        huidigJaar={jaar}
+        vorigJaar={jaar - 1}
+        aantalMaanden={aantalMaanden}
+      />
+    );
+
     const sectie: WaaromSection = isStijging
-      ? { label: "Grootste omzetstijgers", iconDirection: "up", tone: "emerald", oorzaken: topOorzaken(omzetAfwijkingen, "stijgers") }
-      : { label: "Grootste omzetdalers", iconDirection: "down", tone: "amber", oorzaken: topOorzaken(omzetAfwijkingen, "dalers") };
+      ? { label: "Grootste omzetstijgers", iconDirection: "up", tone: "emerald", oorzaken: topOorzaken(omzetAfwijkingen, "stijgers"), expandRenderer }
+      : { label: "Grootste omzetdalers", iconDirection: "down", tone: "amber", oorzaken: topOorzaken(omzetAfwijkingen, "dalers"), expandRenderer };
 
     const concreet = sectie.oorzaken
       .slice(0, 2)
       .map(o => `${o.name} ${isStijging ? "steeg" : "daalde"} met ${euroAbs(o.delta)}`)
       .join(" en ");
 
-    const conclusie = `Je omzet is ${richting} met ${euroAbs(omzetDelta)} t.o.v. dezelfde periode vorig jaar.${concreet ? ` Grootste ${isStijging ? "bijdragen" : "verliezen"}: ${concreet}.` : " Geen materiele verschuivingen op postniveau."}`;
+    const conclusie = `Je omzet is ${richting} met ${euroAbs(omzetDelta)} t.o.v. dezelfde periode vorig jaar.${concreet ? ` Grootste ${isStijging ? "bijdragen" : "verliezen"}: ${concreet}.` : " Geen materiele verschuivingen op postniveau."} Klik een categorie voor cliënt-detail.`;
 
     return {
       titel: `Waarom is je omzet ${richting}?`,
@@ -220,7 +232,7 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
       sections: [sectie],
       conclusie,
     };
-  }, [heeftVorigeData, huidig.omzet, vorigSamePeriod, omzetAfwijkingen, periodeLabel]);
+  }, [heeftVorigeData, huidig.omzet, vorigSamePeriod, omzetAfwijkingen, periodeLabel, jaar, aantalMaanden]);
 
   // ─── Kosten ─────────────────────────────────────────────────────────────────
   const kostenWaarom = useMemo<WaaromData | null>(() => {
