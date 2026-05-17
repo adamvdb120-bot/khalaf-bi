@@ -183,21 +183,35 @@ export async function GET() {
     interface DeclRow { budgethouder: string | null; bedrag: number | null; status: string | null; periode: string | null }
     interface BudgRow { budgethouder: string; budget: number }
 
-    const [declHuidigRes, declVorigRes, budgRes] = await Promise.all([
+    // Bepaal het 'actieve' declaratiejaar: probeer huidig kalenderjaar,
+    // val dan terug op het jaar ervoor en daarvoor. Voorkomt dat alle
+    // checks leeg blijven in januari/februari als de nieuwe declaraties
+    // nog niet zijn ingeladen.
+    let actiefJaar = huidigJaar;
+    let declHuidig: DeclRow[] = [];
+    for (const tryJaar of [huidigJaar, huidigJaar - 1, huidigJaar - 2]) {
+      const res = await admin.from("attiva_declaraties")
+        .select("budgethouder, bedrag, status, periode")
+        .eq("jaar", tryJaar)
+        .not("bedrag", "is", null);
+      const rows = (res.data as DeclRow[] | null) ?? [];
+      if (rows.length > 0) {
+        declHuidig = rows;
+        actiefJaar = tryJaar;
+        break;
+      }
+    }
+
+    const [declVorigRes, budgRes] = await Promise.all([
       admin.from("attiva_declaraties")
         .select("budgethouder, bedrag, status, periode")
-        .eq("jaar", huidigJaar)
-        .not("bedrag", "is", null),
-      admin.from("attiva_declaraties")
-        .select("budgethouder, bedrag, status, periode")
-        .eq("jaar", huidigJaar - 1)
+        .eq("jaar", actiefJaar - 1)
         .not("bedrag", "is", null),
       admin.from("attiva_pgb_budgetten")
         .select("budgethouder, budget")
-        .eq("jaar", huidigJaar),
+        .eq("jaar", actiefJaar),
     ]);
 
-    const declHuidig = (declHuidigRes.data as DeclRow[] | null) ?? [];
     const declVorig = (declVorigRes.data as DeclRow[] | null) ?? [];
     const budgetten = (budgRes.data as BudgRow[] | null) ?? [];
 
