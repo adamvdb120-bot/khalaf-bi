@@ -6,6 +6,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+import type { Formatter, ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Pin, Download, Check, Maximize2, X } from "lucide-react";
 
 export interface ChartDef {
@@ -185,10 +186,10 @@ export function ChartRenderer({
               <XAxis dataKey={labelKey} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={axisFmt} />
               <Tooltip
-                formatter={(v: unknown, name: string) => {
+                formatter={((v, name) => {
                   const key = chart.keys.find(k => k.key === name);
-                  return [fmt(v as number, name), key?.label ?? name];
-                }}
+                  return [fmt(Number(v ?? 0), String(name ?? "")), key?.label ?? name];
+                }) as Formatter<ValueType, NameType>}
                 contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
               />
               <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={(value) => chart.keys.find(k => k.key === value)?.label ?? value} />
@@ -202,10 +203,10 @@ export function ChartRenderer({
               <XAxis dataKey={labelKey} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={axisFmt} domain={["auto", "auto"]} />
               <Tooltip
-                formatter={(v: unknown, name: string) => {
+                formatter={((v, name) => {
                   const key = chart.keys.find(k => k.key === name);
-                  return [fmt(v as number, name), key?.label ?? name];
-                }}
+                  return [fmt(Number(v ?? 0), String(name ?? "")), key?.label ?? name];
+                }) as Formatter<ValueType, NameType>}
                 contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
               />
               <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} formatter={(value) => chart.keys.find(k => k.key === value)?.label ?? value} />
@@ -218,14 +219,14 @@ export function ChartRenderer({
             <PieChart>
               <Pie data={chart.data} dataKey={chart.keys[0]?.key ?? "value"}
                 nameKey={labelKey} cx="50%" cy="50%" outerRadius={Math.round(height * 0.28)}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 labelLine={false}>
                 {chart.data.map((_, i) => (
                   <Cell key={i} fill={["#1B3A5C", "#C9A84C", "#3d7ac8", "#e07b39", "#56a88f", "#9b59b6"][i % 6]} />
                 ))}
               </Pie>
               <Tooltip
-                formatter={(v: unknown, name: string) => [fmt(v as number, name), name]}
+                formatter={((v, name) => [fmt(Number(v ?? 0), String(name ?? "")), name]) as Formatter<ValueType, NameType>}
                 contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
               />
             </PieChart>

@@ -1,28 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { BarChart2, FileText, TrendingUp, Wallet } from "lucide-react";
 import AttivaCharts from "./AttivaCharts";
 import DeclaratiesSection from "./DeclaratiesSection";
 import CashflowSection from "./CashflowSection";
 import CrediteurenSection from "./CrediteurenSection";
+import { CLIENTS, type DashboardTabId } from "@/lib/clients/config";
 
-const TABS = [
+const TAB_DEFS: { id: DashboardTabId; label: string; icon: typeof BarChart2 }[] = [
   { id: "financieel", label: "Financieel overzicht", icon: BarChart2 },
   { id: "cashflow", label: "Cashflow", icon: TrendingUp },
   { id: "crediteuren", label: "Crediteuren", icon: Wallet },
   { id: "declaraties", label: "Declaratieoverzicht", icon: FileText },
 ];
 
-export type AttivaTabId = "financieel" | "cashflow" | "crediteuren" | "declaraties";
+export type AttivaTabId = DashboardTabId;
+
+const ATTIVA_FEATURES = CLIENTS.attiva.features;
+
+function isAttivaTab(v: string | null): v is AttivaTabId {
+  return v === "financieel" || v === "cashflow" || v === "crediteuren" || v === "declaraties";
+}
 
 export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
   const searchParams = useSearchParams();
-  const initialTab = (() => {
+
+  const visibleTabs = useMemo(
+    () => TAB_DEFS.filter((t) => ATTIVA_FEATURES.tabs[t.id]),
+    []
+  );
+  const defaultTab: AttivaTabId = visibleTabs[0]?.id ?? "financieel";
+
+  const initialTab: AttivaTabId = (() => {
     const t = searchParams.get("tab");
-    if (t === "cashflow" || t === "crediteuren" || t === "declaraties") return t;
-    return "financieel";
+    if (isAttivaTab(t) && ATTIVA_FEATURES.tabs[t]) return t;
+    return defaultTab;
   })();
   const [active, setActive] = useState<AttivaTabId>(initialTab);
   const [scrollTarget, setScrollTarget] = useState<string | null>(null);
@@ -30,7 +44,7 @@ export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
   // ?tab=… of #anchor in URL respecteren bij navigatie binnen de app
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t === "cashflow" || t === "crediteuren" || t === "declaraties" || t === "financieel") {
+    if (isAttivaTab(t) && ATTIVA_FEATURES.tabs[t]) {
       setActive(t);
     }
   }, [searchParams]);
@@ -70,10 +84,10 @@ export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
     <div className="space-y-6">
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 w-fit">
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActive(tab.id as AttivaTabId)}
+            onClick={() => setActive(tab.id)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
               active === tab.id
                 ? "bg-white text-navy-700 shadow-sm"

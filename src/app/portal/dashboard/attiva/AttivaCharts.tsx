@@ -22,6 +22,9 @@ import PresentationMode from "@/components/portal/PresentationMode";
 import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
 import { Presentation } from "lucide-react";
+import { CLIENTS } from "@/lib/clients/config";
+
+const ATTIVA_FEATURES = CLIENTS.attiva.features;
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface Debiteur { Name: string; Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number }
@@ -479,17 +482,20 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
             </span>
           )}
           {/* Vraag je data — opent zij-paneel met AI chat */}
-          <button
-            onClick={() => setChatOpen(true)}
-            className="flex items-center gap-1.5 text-xs bg-navy-700 hover:bg-navy-600 text-white font-semibold rounded-lg px-3 py-1.5 transition-colors shadow-sm"
-          >
-            <MessageSquare size={12} />
-            Vraag je data
-          </button>
+          {ATTIVA_FEATURES.aiChat && (
+            <button
+              onClick={() => setChatOpen(true)}
+              className="flex items-center gap-1.5 text-xs bg-navy-700 hover:bg-navy-600 text-white font-semibold rounded-lg px-3 py-1.5 transition-colors shadow-sm"
+            >
+              <MessageSquare size={12} />
+              Vraag je data
+            </button>
+          )}
           <ActiesMenu
             onRefresh={() => load(jaar, true)}
             onPresentatie={() => setShowPresentation(true)}
-            onRapport={() => setRapportOpen(true)}
+            onRapport={ATTIVA_FEATURES.pdfExport ? () => setRapportOpen(true) : undefined}
+            pdfExport={ATTIVA_FEATURES.pdfExport}
             presentatieDisabled={maandData.length === 0}
           />
         </div>
@@ -686,8 +692,10 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
                 name="Omzet"
                 radius={[5,5,0,0]}
                 style={{ cursor: "pointer" }}
-                onClick={(data: { maand: string }) => {
-                  const periodeNr = MAANDEN.indexOf(data.maand) + 1;
+                onClick={(data) => {
+                  const maandLabel = (data as { maand?: string }).maand;
+                  if (!maandLabel) return;
+                  const periodeNr = MAANDEN.indexOf(maandLabel) + 1;
                   if (periodeNr > 0) setDetailMaand(periodeNr);
                 }}
               >
@@ -700,8 +708,10 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
                 name="Kosten"
                 radius={[5,5,0,0]}
                 style={{ cursor: "pointer" }}
-                onClick={(data: { maand: string }) => {
-                  const periodeNr = MAANDEN.indexOf(data.maand) + 1;
+                onClick={(data) => {
+                  const maandLabel = (data as { maand?: string }).maand;
+                  if (!maandLabel) return;
+                  const periodeNr = MAANDEN.indexOf(maandLabel) + 1;
                   if (periodeNr > 0) setDetailMaand(periodeNr);
                 }}
               >
@@ -727,7 +737,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
             )}
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={toonPrognose && !maand ? prognoseLijnData : maandData}>
+            <LineChart data={(toonPrognose && !maand ? prognoseLijnData : maandData) as unknown as Record<string, unknown>[]}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
               <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
@@ -952,7 +962,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       {/* Chat zit nu in het zij-paneel — altijd gemount zodat history bewaard blijft */}
-      {maandData.length > 0 && (
+      {ATTIVA_FEATURES.aiChat && maandData.length > 0 && (
         <ChatSidePanel open={chatOpen} onClose={() => setChatOpen(false)}>
           <DashboardChat
             context={chatContext}
@@ -963,14 +973,16 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       {/* Rapport-modal */}
-      <RapportModal
-        open={rapportOpen}
-        onClose={() => setRapportOpen(false)}
-        targetId="attiva-financieel-export"
-        clientName="Attiva Zorg"
-        clientSlug="attiva"
-        jaarDefault={jaar}
-      />
+      {ATTIVA_FEATURES.pdfExport && (
+        <RapportModal
+          open={rapportOpen}
+          onClose={() => setRapportOpen(false)}
+          targetId="attiva-financieel-export"
+          clientName="Attiva Zorg"
+          clientSlug="attiva"
+          jaarDefault={jaar}
+        />
+      )}
 
       {/* Presentation mode */}
       {showPresentation && (

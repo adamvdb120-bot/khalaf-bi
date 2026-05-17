@@ -64,14 +64,16 @@ export async function GET(req: Request) {
     });
   }
 
+  // Legacy: data zat platgeslagen op root. Nieuw: genest onder `huidig`.
+  // We ondersteunen beide vormen.
   const fullData = dataRow.data as {
     huidig?: { jaar: number; pl: PlRow[]; crediteuren: AgedRow[] };
     pl?: PlRow[];
     crediteuren?: AgedRow[];
   };
-  const huidig = fullData.huidig ?? fullData;
-  const pl: PlRow[] = huidig?.pl ?? [];
-  const crediteuren: AgedRow[] = huidig?.crediteuren ?? [];
+  const pl: PlRow[] = fullData.huidig?.pl ?? fullData.pl ?? [];
+  const crediteuren: AgedRow[] = fullData.huidig?.crediteuren ?? fullData.crediteuren ?? [];
+  const dataJaar: number = fullData.huidig?.jaar ?? jaar;
 
   if (pl.length === 0) {
     return NextResponse.json({
@@ -132,7 +134,7 @@ export async function GET(req: Request) {
   const gemKostenEerder = eerdereMaanden.length > 0 ? eerdereMaanden.reduce((s, m) => s + m.kosten, 0) / eerdereMaanden.length : 0;
 
   const dataSummary = `
-JAAR: ${huidig?.jaar ?? jaar}
+JAAR: ${dataJaar}
 TOTAAL YTD:
 - Omzet: €${Math.round(totaalOmzet).toLocaleString("nl-NL")}
 - Kosten: €${Math.round(totaalKosten).toLocaleString("nl-NL")}

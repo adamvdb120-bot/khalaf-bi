@@ -12,6 +12,8 @@ interface ActiesMenuProps {
   onRapport?: () => void;
   refreshing?: boolean;
   presentatieDisabled?: boolean;
+  /** Schakelt PDF/rapport-acties uit voor klanten zonder pdfExport feature. */
+  pdfExport?: boolean;
   /** legacy: directe PDF zonder modal */
   pdf?: {
     targetId: string;
@@ -24,6 +26,7 @@ interface ActiesMenuProps {
 
 export default function ActiesMenu({
   onRefresh, onPresentatie, onRapport, refreshing, presentatieDisabled, pdf,
+  pdfExport = true,
 }: ActiesMenuProps) {
   const [open, setOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -90,7 +93,7 @@ export default function ActiesMenu({
             </div>
           </button>
 
-          {onRapport && (
+          {onRapport && pdfExport && (
             <button
               onClick={() => { onRapport(); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors text-left"
@@ -104,7 +107,7 @@ export default function ActiesMenu({
           )}
 
           {/* Legacy: directe PDF (alleen als geen rapport-modal beschikbaar is) */}
-          {pdf && !onRapport && (
+          {pdf && !onRapport && pdfExport && (
             <button
               onClick={handlePdf}
               disabled={pdfLoading}

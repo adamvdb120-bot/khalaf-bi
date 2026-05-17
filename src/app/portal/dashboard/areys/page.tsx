@@ -4,6 +4,9 @@ import { ChevronLeft } from "lucide-react";
 import DashboardCharts from "@/components/portal/DashboardCharts";
 import DashboardChat from "@/components/portal/DashboardChat";
 import { requireClientAccess } from "@/lib/portal/access";
+import { CLIENTS } from "@/lib/clients/config";
+
+const AREYS_FEATURES = CLIENTS.areys.features;
 
 export default async function AreysDashboard() {
   const user = await requireClientAccess("areys");
@@ -47,10 +50,12 @@ export default async function AreysDashboard() {
       {rows.length > 0 ? (
         <>
           <DashboardCharts rows={rows} columns={columns} uploadName={upload!.name} />
-          <div className="mt-8">
-            <h2 className="text-xl font-bold text-navy-700 mb-4">BI Assistent — Stel een vraag over de data</h2>
-            <DashboardChat uploadId={upload!.id} />
-          </div>
+          {AREYS_FEATURES.aiChat && (
+            <div className="mt-8">
+              <h2 className="text-xl font-bold text-navy-700 mb-4">BI Assistent — Stel een vraag over de data</h2>
+              <DashboardChat uploadId={upload!.id} />
+            </div>
+          )}
         </>
       ) : (
         <div className="card text-center py-16 text-gray-400">

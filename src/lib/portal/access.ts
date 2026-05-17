@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getClientConfig, type ClientConfig } from "@/lib/clients/config";
 
 export interface UserAccess {
   userId: string;
@@ -57,4 +58,27 @@ export async function requireAdmin(): Promise<UserAccess> {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/portal");
   return user;
+}
+
+/**
+ * Geeft de klant-config terug voor de huidige gebruiker. Admins krijgen `null`
+ * (zien alles); klanten met een onbekende slug krijgen ook `null`.
+ */
+export async function getCurrentClientConfig(): Promise<ClientConfig | null> {
+  const user = await requireUser();
+  if (user.role === "admin") return null;
+  return getClientConfig(user.clientSlug);
+}
+
+/**
+ * Vereist dat de gebruiker een geldig klantdashboard heeft (admin of klant met
+ * bekende slug). Anders: terug naar /portal, waar de "geen toegang"-kaart
+ * verschijnt. Gebruik dit voor portal-routes die niet bedoeld zijn voor
+ * accounts zonder gekoppelde klant (bv. data-uploaden, instellingen).
+ */
+export async function requireDashboardAccess(): Promise<UserAccess> {
+  const user = await requireUser();
+  if (user.role === "admin") return user;
+  if (user.role === "client" && getClientConfig(user.clientSlug)) return user;
+  redirect("/portal");
 }

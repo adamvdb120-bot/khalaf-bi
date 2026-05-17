@@ -8,6 +8,7 @@ import { Euro, Users, TrendingUp, Heart } from "lucide-react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
+import type { ClientFeatures } from "@/lib/clients/config";
 
 // ── Hardcoded Ramadan 2026 data ───────────────────────────────────────────────
 const leveranciers = [
@@ -93,7 +94,13 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
   );
 }
 
-export default function MarkazQubaView({ isAdmin = false }: { isAdmin?: boolean }) {
+export default function MarkazQubaView({
+  isAdmin = false,
+  features,
+}: {
+  isAdmin?: boolean;
+  features: ClientFeatures;
+}) {
   const top10 = leveranciers.slice(0, 10);
   const maxBedrag = top10[0]?.bedrag ?? 1;
 
@@ -224,16 +231,18 @@ export default function MarkazQubaView({ isAdmin = false }: { isAdmin?: boolean 
       </div>
 
       {/* AI Chatbot */}
-      <div>
-        <h2 className="text-xl font-bold text-navy-700 mb-4">BI Assistent — Stel een vraag over de data</h2>
-        <DashboardChat
-          uploadIds={["abe94fbd-04b5-46b6-96bc-f40f9970975a", "84a78625-fb63-497a-935a-e50d1ff2924a"]}
-          context={`Inzamelingsdata Ramadan 2026:
+      {features.aiChat && (
+        <div>
+          <h2 className="text-xl font-bold text-navy-700 mb-4">BI Assistent — Stel een vraag over de data</h2>
+          <DashboardChat
+            uploadIds={["abe94fbd-04b5-46b6-96bc-f40f9970975a", "84a78625-fb63-497a-935a-e50d1ff2924a"]}
+            context={`Inzamelingsdata Ramadan 2026:
 - Iftar Inzameling: € 43.500 ingezameld van € 45.000 doel (96.7%, nog € 1.500 te gaan)
 - Project Quba (renovatiefonds): € 64.258 ingezameld van € 100.000 doel (64.3%, nog € 35.742 te gaan)
 - Dawah Dragers (vrijwilligers): 68 aangemeld van 500 doel (13.6%, nog 432 te gaan)`}
-        />
-      </div>
+          />
+        </div>
+      )}
 
       {/* Alle leveranciers tabel */}
       <div className="card">

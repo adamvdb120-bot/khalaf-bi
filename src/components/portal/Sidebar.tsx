@@ -7,18 +7,23 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import NotificationBell from "./NotificationBell";
+import { isClientSlug, isFeatureEnabled } from "@/lib/clients/config";
 
-const nav = [
+const FULL_NAV = [
   { href: "/portal", label: "Overzicht", icon: Home, exact: true },
   { href: "/portal/data-uploaden", label: "Data uploaden", icon: Upload, exact: false },
   { href: "/portal/instellingen", label: "Instellingen", icon: Settings, exact: false },
 ];
+
+const MINIMAL_NAV = FULL_NAV.filter((n) => n.href === "/portal");
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState("");
+  const [clientSlug, setClientSlug] = useState<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -27,12 +32,25 @@ export default function Sidebar() {
       if (!user) return;
       setUserName(user.email?.split("@")[0] ?? "");
       const { data: profile } = await supabase
-        .from("profiles").select("role, full_name").eq("id", user.id).single();
+        .from("profiles").select("role, full_name, client_slug").eq("id", user.id).single();
       if (profile?.role === "admin") setIsAdmin(true);
       if (profile?.full_name) setUserName(profile.full_name);
+      setClientSlug(profile?.client_slug ?? null);
+      setProfileLoaded(true);
     }
     load();
   }, []);
+
+  // Heeft de gebruiker toegang tot een echt dashboard? Admins altijd; klanten
+  // alleen met een bekende slug.
+  const hasDashboardAccess = isAdmin || isClientSlug(clientSlug);
+
+  // Tot het profiel geladen is tonen we de minimale nav om flicker te voorkomen.
+  const nav = !profileLoaded || !hasDashboardAccess ? MINIMAL_NAV : FULL_NAV;
+
+  const showNotifications =
+    profileLoaded && hasDashboardAccess &&
+    (isAdmin || isFeatureEnabled(clientSlug, "notifications"));
 
   async function handleLogout() {
     const supabase = createClient();
@@ -74,7 +92,7 @@ export default function Sidebar() {
         })}
 
         {/* Meldingen — popup-paneel met urgent zaken */}
-        <NotificationBell />
+        {showNotifications && <NotificationBell />}
 
         {/* Admin sectie */}
         {isAdmin && (

@@ -59,17 +59,17 @@ export async function GET(req: Request) {
     });
   }
 
+  // Legacy: data zat platgeslagen op root. Nieuw: genest onder `huidig` / `vorig`.
   const fullData = dataRow.data as {
     huidig?: { jaar: number; pl: PlRow[]; crediteuren: AgedRow[] };
     vorig?: { pl: PlRow[] };
     pl?: PlRow[];
     crediteuren?: AgedRow[];
   };
-  const huidig = fullData.huidig ?? fullData;
-  const vorig = fullData.vorig;
-  const pl: PlRow[] = huidig?.pl ?? [];
-  const vorigPl: PlRow[] = vorig?.pl ?? [];
-  const crediteuren: AgedRow[] = huidig?.crediteuren ?? [];
+  const pl: PlRow[] = fullData.huidig?.pl ?? fullData.pl ?? [];
+  const vorigPl: PlRow[] = fullData.vorig?.pl ?? [];
+  const crediteuren: AgedRow[] = fullData.huidig?.crediteuren ?? fullData.crediteuren ?? [];
+  const dataJaar: number = fullData.huidig?.jaar ?? jaar;
 
   if (pl.length === 0) {
     return NextResponse.json({
@@ -123,7 +123,7 @@ export async function GET(req: Request) {
   const topUrgent = crediteuren.filter(c => (c.Age90Plus ?? 0) > 0).sort((a, b) => (b.Age90Plus ?? 0) - (a.Age90Plus ?? 0)).slice(0, 2);
 
   const dataSummary = `
-JAAR: ${huidig?.jaar ?? jaar} (data t/m ${MAANDEN[maxPeriode - 1]})
+JAAR: ${dataJaar} (data t/m ${MAANDEN[maxPeriode - 1]})
 OMZET YTD: €${Math.round(totaalOmzet).toLocaleString("nl-NL")} (vorig zelfde periode: €${Math.round(vorigOmzet).toLocaleString("nl-NL")}, ${yoyOmzet >= 0 ? "+" : ""}${yoyOmzet.toFixed(1)}%)
 KOSTEN YTD: €${Math.round(totaalKosten).toLocaleString("nl-NL")} (vorig zelfde periode: €${Math.round(vorigKosten).toLocaleString("nl-NL")}, ${yoyKosten >= 0 ? "+" : ""}${yoyKosten.toFixed(1)}%)
 RESULTAAT YTD: €${Math.round(totaalOmzet - totaalKosten).toLocaleString("nl-NL")} (brutomarge ${margePct.toFixed(1)}%)

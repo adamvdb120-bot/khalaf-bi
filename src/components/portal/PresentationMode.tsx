@@ -351,9 +351,11 @@ function SlideKpi({ data }: { data: PresentationData }) {
 
 function SlideOmzetKosten({ data, onMaandClick }: { data: PresentationData; onMaandClick?: (periode: number) => void }) {
   const MAANDEN = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
-  function handleClick(rowData: { maand: string }) {
+  function handleClick(rowData: unknown) {
     if (!onMaandClick) return;
-    const periode = MAANDEN.indexOf(rowData.maand) + 1;
+    const maand = (rowData as { maand?: string }).maand;
+    if (!maand) return;
+    const periode = MAANDEN.indexOf(maand) + 1;
     if (periode > 0) onMaandClick(periode);
   }
   return (
@@ -397,8 +399,9 @@ function SlideOmzet({ data, onCategorieClick }: { data: PresentationData; onCate
       </div>
     );
   }
-  function handleBarClick(rowData: { name: string }) {
-    if (onCategorieClick && rowData.name) onCategorieClick(rowData.name, "omzet");
+  function handleBarClick(rowData: unknown) {
+    const name = (rowData as { name?: string }).name;
+    if (onCategorieClick && name) onCategorieClick(name, "omzet");
   }
   return (
     <div className="space-y-6">
@@ -458,8 +461,9 @@ function SlideOmzet({ data, onCategorieClick }: { data: PresentationData; onCate
 
 function SlideKosten({ data, onCategorieClick }: { data: PresentationData; onCategorieClick?: (naam: string, type: "omzet" | "kosten") => void }) {
   const top = data.topKosten.slice(0, 8);
-  function handleBarClick(rowData: { name: string }) {
-    if (onCategorieClick && rowData.name) onCategorieClick(rowData.name, "kosten");
+  function handleBarClick(rowData: unknown) {
+    const name = (rowData as { name?: string }).name;
+    if (onCategorieClick && name) onCategorieClick(name, "kosten");
   }
   return (
     <div className="space-y-6">

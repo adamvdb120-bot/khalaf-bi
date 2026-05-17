@@ -4,6 +4,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+import type { Formatter, ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { TrendingUp, ShoppingCart, Euro, Percent } from "lucide-react";
 
 interface Row { [key: string]: unknown }
@@ -173,7 +174,7 @@ export default function DashboardCharts({ rows, columns, uploadName }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="datum" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `€${(v/1000).toFixed(1)}K`} />
-              <Tooltip formatter={(v: number, name: string) => [euro(v), name === "omzet" ? "Omzet" : "Kosten"]} />
+              <Tooltip formatter={((v, name) => [euro(Number(v ?? 0)), name === "omzet" ? "Omzet" : "Kosten"]) as Formatter<ValueType, NameType>} />
               <Line type="monotone" dataKey="omzet" stroke="#1B3A5C" strokeWidth={2.5}
                 dot={false} activeDot={{ r: 5, fill: "#C9A84C" }} />
               {kostenCol && (
@@ -195,7 +196,7 @@ export default function DashboardCharts({ rows, columns, uploadName }: Props) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="datum" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => [v, "Orders"]} />
+                <Tooltip formatter={((v) => [Number(v ?? 0), "Orders"]) as Formatter<ValueType, NameType>} />
                 <Bar dataKey="orders" fill="#C9A84C" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -210,7 +211,7 @@ export default function DashboardCharts({ rows, columns, uploadName }: Props) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="dag" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `€${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: number) => [euro(v), "Gem. omzet"]} />
+                <Tooltip formatter={((v) => [euro(Number(v ?? 0)), "Gem. omzet"]) as Formatter<ValueType, NameType>} />
                 <Bar dataKey="omzet" radius={[4, 4, 0, 0]}>
                   {dagData.map((_, i) => (
                     <Cell key={i} fill={i === dagData.reduce((mi, d, ci) =>
@@ -233,7 +234,7 @@ export default function DashboardCharts({ rows, columns, uploadName }: Props) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `€${(v/1000).toFixed(0)}K`} />
                 <YAxis type="category" dataKey="naam" tick={{ fontSize: 12 }} width={80} />
-                <Tooltip formatter={(v: number) => [euro(v), "Omzet"]} />
+                <Tooltip formatter={((v) => [euro(Number(v ?? 0)), "Omzet"]) as Formatter<ValueType, NameType>} />
                 <Bar dataKey="omzet" fill="#1B3A5C" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -245,12 +246,13 @@ export default function DashboardCharts({ rows, columns, uploadName }: Props) {
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie data={pieData} dataKey="omzet" nameKey="naam"
-                    cx="50%" cy="50%" outerRadius={80} label={({ naam, percent }) =>
-                      `${naam} ${(percent * 100).toFixed(0)}%`}
+                    cx="50%" cy="50%" outerRadius={80}
+                    label={(props: { naam?: string; percent?: number }) =>
+                      `${props.naam ?? ""} ${((props.percent ?? 0) * 100).toFixed(0)}%`}
                     labelLine={false}>
                     {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => [euro(v), "Omzet"]} />
+                  <Tooltip formatter={((v) => [euro(Number(v ?? 0)), "Omzet"]) as Formatter<ValueType, NameType>} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

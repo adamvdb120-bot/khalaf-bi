@@ -8,9 +8,8 @@ const nextConfig: NextConfig = {
     contentDispositionType: "attachment",
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
-  // TypeScript en ESLint waarschuwingen niet blokkerend bij build
-  // (dev mode blijft strict — fouten zie je nog steeds in de editor)
-  typescript: { ignoreBuildErrors: true },
+  // TypeScript-fouten blokkeren de build (tsc --noEmit staat op 0).
+  // ESLint nog buiten scope — apart oppakken.
   eslint: { ignoreDuringBuilds: true },
 };
 
@@ -24,7 +23,8 @@ export default withSentryConfig(nextConfig, {
   // Source maps uploaden alleen in productie + alleen als auth token bestaat
   widenClientFileUpload: true,
   reactComponentAnnotation: { enabled: true },
-  hideSourceMaps: true,
+  // Sourcemaps na upload verwijderen uit de build-output (was: hideSourceMaps)
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
   disableLogger: true,
   // Tunnel-route omzeilt ad-blockers die Sentry blokkeren
   tunnelRoute: "/monitoring",

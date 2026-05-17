@@ -23,7 +23,7 @@ async function refreshExactToken(admin: Admin, row: Record<string, string>) {
     refresh_token: tokens.refresh_token,
     expires_at: expiresAt,
   }).eq("client_name", "attiva");
-  return { token: tokens.access_token, division: row.division };
+  return { token: tokens.access_token as string, division: Number(row.division) };
 }
 
 export async function getValidExactToken(admin: Admin):
