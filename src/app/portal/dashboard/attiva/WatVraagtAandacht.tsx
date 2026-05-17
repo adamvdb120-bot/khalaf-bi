@@ -5,8 +5,10 @@ import Link from "next/link";
 import {
   Zap, CheckCircle2, AlertCircle, AlertTriangle, Info,
   Wallet, TrendingDown, Plug, Database, Target, UserX,
-  ArrowRight,
+  ArrowRight, ChevronDown, ChevronUp,
 } from "lucide-react";
+
+const VISIBLE_DEFAULT = 3;
 
 interface Notification {
   id: string;
@@ -32,6 +34,7 @@ const TYPE_ICONS = {
 export default function WatVraagtAandacht() {
   const [notifications, setNotifications] = useState<Notification[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +64,7 @@ export default function WatVraagtAandacht() {
     );
   }
 
-  // Lege state — alles in orde
+  // Lege state — geen urgente acties
   if (!notifications || notifications.length === 0) {
     return (
       <div className="card flex items-center gap-3 py-4 px-5 border-l-4 border-l-emerald-500">
@@ -69,8 +72,7 @@ export default function WatVraagtAandacht() {
           <CheckCircle2 size={18} className="text-emerald-600" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-bold text-navy-700">Alles in orde deze week</p>
-          <p className="text-xs text-gray-500 mt-0.5">Geen acute aandachtspunten — kijken kan, ingrijpen hoeft niet.</p>
+          <p className="text-sm font-bold text-navy-700">Geen urgente acties deze week</p>
         </div>
       </div>
     );
@@ -85,6 +87,11 @@ export default function WatVraagtAandacht() {
   }[hoogsteSeverity];
 
   const alarmCount = notifications.filter(n => n.severity === "alarm").length;
+
+  // Standaard tonen we maximaal de eerste 3 (al gesorteerd op prioriteit).
+  // Klikken op "Bekijk alle…" toont de rest. Voorkomt dat de kaart te druk wordt.
+  const hasMore = notifications.length > VISIBLE_DEFAULT;
+  const zichtbaar = expanded || !hasMore ? notifications : notifications.slice(0, VISIBLE_DEFAULT);
 
   return (
     <div className={`card border-l-4 ${randKleur} p-0 overflow-hidden`}>
@@ -106,7 +113,7 @@ export default function WatVraagtAandacht() {
 
       {/* Lijst */}
       <div className="divide-y divide-gray-50">
-        {notifications.map((n) => {
+        {zichtbaar.map((n) => {
           const Icon = TYPE_ICONS[n.type] ?? Info;
           const SeverityIcon = n.severity === "alarm" ? AlertCircle : n.severity === "attention" ? AlertTriangle : Info;
           const sev = {
@@ -141,6 +148,26 @@ export default function WatVraagtAandacht() {
           );
         })}
       </div>
+
+      {/* Toggle voor meer/minder */}
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="w-full flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-semibold text-gray-500 hover:text-navy-700 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp size={13} />
+              Minder tonen
+            </>
+          ) : (
+            <>
+              <ChevronDown size={13} />
+              Bekijk alle {notifications.length} meldingen
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }

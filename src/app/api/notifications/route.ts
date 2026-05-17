@@ -290,9 +290,18 @@ export async function GET() {
     }
   }
 
-  // Sorteer op severity (alarm > attention > info)
+  // Sorteren: eerst op severity, dan binnen severity op type-prioriteit zodat
+  // de meest acute soort signalen bovenaan komt (exact stuk > negatief
+  // resultaat > over budget > urgente crediteuren > ...).
   const severityRank = { alarm: 0, attention: 1, info: 2 };
-  notifications.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+  const typeRank: Record<Notification["type"], number> = {
+    exact: 0, marge: 1, budget: 2, crediteur: 3, client: 4, data: 5, info: 6,
+  };
+  notifications.sort((a, b) => {
+    const sev = severityRank[a.severity] - severityRank[b.severity];
+    if (sev !== 0) return sev;
+    return typeRank[a.type] - typeRank[b.type];
+  });
 
   return NextResponse.json({ notifications });
 }
