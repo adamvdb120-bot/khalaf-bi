@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ArrowUpRight, ArrowDownRight, Minus, TrendingUp, AlertTriangle,
   Scale, CheckCircle2, Briefcase, HelpCircle,
@@ -56,12 +56,84 @@ function categoriesByPl(pl: PlRow[], isRevenue: boolean, periodeLimit?: number) 
   return map;
 }
 
+interface ClientDelta {
+  naam: string;
+  nu: number;
+  vorig: number;
+  delta: number;
+}
+
+interface PersoonApi {
+  naam: string;
+  totaal: number;
+  perMaand: number[];
+}
+
+interface DeclaratiesPerPersoonResponse {
+  jaar: number;
+  totaal: number;
+  aantalPersonen: number;
+  personen: PersoonApi[];
+}
+
+function sumPerMaand(perMaand: number[] | undefined, limit: number): number {
+  if (!perMaand) return 0;
+  const end = Math.min(limit, perMaand.length);
+  let s = 0;
+  for (let i = 0; i < end; i++) s += perMaand[i] ?? 0;
+  return s;
+}
+
 export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
   const [waaromOpen, setWaaromOpen] = useState<WaaromMetric | null>(null);
+  // Cliënt-bewegingen uit declaraties — upfront geladen zodat de Omzet-
+  // conclusie een tweede zin met cliënt-namen kan tonen (op PGB-zorg).
+  const [clientDeltas, setClientDeltas] = useState<ClientDelta[] | null>(null);
 
   // Huidige jaar totalen
   const huidig = sumPl(pl);
   const aantalMaanden = huidig.maxPeriod;
+
+  // Cliënt-data ophalen voor de Omzet-conclusie. Faalt stil — als er geen
+  // declaraties zijn (of het Areys/Quba is later) blijft het categorie-niveau.
+  useEffect(() => {
+    if (aantalMaanden === 0) return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const [r1, r2] = await Promise.all([
+          fetch(`/api/attiva/declaraties-per-persoon?jaar=${jaar}`),
+          fetch(`/api/attiva/declaraties-per-persoon?jaar=${jaar - 1}`),
+        ]);
+        const huidigData: DeclaratiesPerPersoonResponse | null = r1.ok ? await r1.json() : null;
+        const vorigData: DeclaratiesPerPersoonResponse | null = r2.ok ? await r2.json() : null;
+        if (!huidigData && !vorigData) return;
+
+        const nuMap = new Map<string, number>();
+        for (const p of huidigData?.personen ?? []) {
+          nuMap.set(p.naam, sumPerMaand(p.perMaand, aantalMaanden));
+        }
+        const vorigMap = new Map<string, number>();
+        for (const p of vorigData?.personen ?? []) {
+          vorigMap.set(p.naam, sumPerMaand(p.perMaand, aantalMaanden));
+        }
+        const allNamen = new Set<string>([...nuMap.keys(), ...vorigMap.keys()]);
+        const merged: ClientDelta[] = Array.from(allNamen).map(naam => {
+          const nu = nuMap.get(naam) ?? 0;
+          const vorig = vorigMap.get(naam) ?? 0;
+          return { naam, nu, vorig, delta: nu - vorig };
+        })
+          .filter(c => Math.abs(c.delta) > 500)
+          .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+        if (!cancelled) setClientDeltas(merged);
+      } catch {
+        // Faalt stil — conclusie blijft op categorie-niveau.
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [jaar, aantalMaanden]);
 
   // Voor eerlijke YoY-vergelijking: vorig jaar same period limit (Jan t/m laatste maand met data)
   const vorigSamePeriod = (() => {
@@ -219,7 +291,35 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
       .map(o => `${o.name} ${isStijging ? "steeg" : "daalde"} met ${euroAbs(o.delta)}`)
       .join(" en ");
 
-    const conclusie = `Je omzet is ${richting} met ${euroAbs(omzetDelta)} t.o.v. dezelfde periode vorig jaar.${concreet ? ` Grootste ${isStijging ? "bijdragen" : "verliezen"}: ${concreet}.` : " Geen materiele verschuivingen op postniveau."} Klik een categorie voor cliënt-detail.`;
+    // Verrijk met cliënt-niveau verhaal als declaraties geladen zijn.
+    // Bij daling: noem grootste cliënt-daler + compensatie van top stijgers.
+    // Bij stijging: noem grootste cliënt-stijger + eventuele uitval.
+    let clientZin = "";
+    if (clientDeltas && clientDeltas.length > 0) {
+      const dalers = clientDeltas.filter(c => c.delta < 0);
+      const stijgers = clientDeltas.filter(c => c.delta > 0);
+      const topDaler = dalers[0];
+      const topStijger = stijgers[0];
+      const topTweeStijgers = stijgers.slice(0, 2);
+
+      if (!isStijging && topDaler) {
+        const stijgersTekst = topTweeStijgers.length > 0
+          ? ` Dit wordt deels gecompenseerd door ${topTweeStijgers.map(s => `${s.naam} (+${euroAbs(s.delta)})`).join(" en ")}.`
+          : "";
+        clientZin = ` Op cliëntniveau: ${topDaler.naam} viel grotendeels weg (−${euroAbs(topDaler.delta)}).${stijgersTekst}`;
+      } else if (isStijging && topStijger) {
+        const dalersTekst = topDaler
+          ? ` Wel viel ${topDaler.naam} grotendeels weg (−${euroAbs(topDaler.delta)}).`
+          : "";
+        const extraStijger = stijgers[1]
+          ? ` en ${stijgers[1].naam} (+${euroAbs(stijgers[1].delta)})`
+          : "";
+        clientZin = ` Op cliëntniveau: grootste groei bij ${topStijger.naam} (+${euroAbs(topStijger.delta)})${extraStijger}.${dalersTekst}`;
+      }
+    }
+
+    const klikHint = clientDeltas ? "" : " Klik een categorie voor cliënt-detail.";
+    const conclusie = `Je omzet is ${richting} met ${euroAbs(omzetDelta)} t.o.v. dezelfde periode vorig jaar.${concreet ? ` Grootste ${isStijging ? "bijdragen" : "verliezen"}: ${concreet}.` : " Geen materiele verschuivingen op postniveau."}${clientZin}${klikHint}`;
 
     return {
       titel: `Waarom is je omzet ${richting}?`,
@@ -232,7 +332,7 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
       sections: [sectie],
       conclusie,
     };
-  }, [heeftVorigeData, huidig.omzet, vorigSamePeriod, omzetAfwijkingen, periodeLabel, jaar, aantalMaanden]);
+  }, [heeftVorigeData, huidig.omzet, vorigSamePeriod, omzetAfwijkingen, periodeLabel, jaar, aantalMaanden, clientDeltas]);
 
   // ─── Kosten ─────────────────────────────────────────────────────────────────
   const kostenWaarom = useMemo<WaaromData | null>(() => {
