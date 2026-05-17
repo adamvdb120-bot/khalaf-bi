@@ -86,8 +86,9 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
     const vorig = kostenVorig[name] ?? 0;
     return { name, nu, vorig, delta: nu - vorig, deltaPct: vorig > 0 ? ((nu - vorig) / vorig) * 100 : null };
   })
-    // Alleen materiele veranderingen
-    .filter(a => Math.abs(a.delta) > 1000 && a.vorig > 100);
+    // Alleen materiele veranderingen. (a.vorig > 100 OR a.nu > 100) zodat
+    // nieuwe kostenposten (vorig jaar 0, dit jaar bv. €8k) ook meekomen.
+    .filter(a => Math.abs(a.delta) > 1000 && (a.vorig > 100 || a.nu > 100));
   const grootsteKostenStijging = [...kostenAfwijkingen].sort((a, b) => b.delta - a.delta)[0];
   const grootsteKostenDaling = [...kostenAfwijkingen].sort((a, b) => a.delta - b.delta)[0];
 
