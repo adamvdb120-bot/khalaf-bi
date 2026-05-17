@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { RefreshCw, AlertCircle, Users, Wallet, Heart, Pencil, ShieldCheck, AlertTriangle, X, Check } from "lucide-react";
+import { RefreshCw, AlertCircle, Users, Wallet, Heart, Pencil, ShieldCheck, AlertTriangle, X, Check, Loader2 } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
@@ -43,6 +43,11 @@ function initials(naam: string) {
   return naam.split(/[\s.]+/).filter(Boolean).slice(0, 2).map(n => n[0]).join("").toUpperCase();
 }
 
+interface BudgetRow {
+  budgethouder: string;
+  budget: number;
+}
+
 export default function DeclaratiesSection() {
   const [data, setData] = useState<DeclaratieData | null>(null);
   const [vorigData, setVorigData] = useState<DeclaratieData | null>(null);
@@ -51,19 +56,37 @@ export default function DeclaratiesSection() {
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
   const [maand, setMaand] = useState<string | null>(null);
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
+  // Budgetten: map van budgethouder → jaarbudget. Lokaal up-to-date gehouden
+  // na inline-edit zonder dat we de hele pagina hoeven te reloaden.
+  const [budgetten, setBudgetten] = useState<Record<string, number>>({});
+  const [editingNaam, setEditingNaam] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+  const [savingNaam, setSavingNaam] = useState<string | null>(null);
 
   async function load(j: number) {
     setLoading(true);
     setError(null);
     try {
-      const [res, resVorig] = await Promise.all([
+      const [res, resVorig, resBudg] = await Promise.all([
         fetch(`/api/attiva/declaraties?jaar=${j}`),
         fetch(`/api/attiva/declaraties?jaar=${j - 1}`),
+        fetch(`/api/attiva/budgetten?jaar=${j}`),
       ]);
       if (!res.ok) throw new Error(await res.text());
-      const [d, dv] = await Promise.all([res.json(), resVorig.ok ? resVorig.json() : null]);
+      const [d, dv, budg] = await Promise.all([
+        res.json(),
+        resVorig.ok ? resVorig.json() : null,
+        resBudg.ok ? resBudg.json() : [],
+      ]);
       setData(d);
       setVorigData(dv);
+      const budMap: Record<string, number> = {};
+      for (const row of (budg as BudgetRow[]) ?? []) {
+        if (row.budgethouder && typeof row.budget === "number") {
+          budMap[row.budgethouder] = row.budget;
+        }
+      }
+      setBudgetten(budMap);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Onbekende fout");
     } finally {
@@ -72,7 +95,36 @@ export default function DeclaratiesSection() {
   }
 
   useEffect(() => { load(jaar); }, [jaar]);
-  useEffect(() => { setMaand(null); }, [jaar]);
+  useEffect(() => { setMaand(null); setEditingNaam(null); }, [jaar]);
+
+  async function saveBudget(budgethouder: string, nieuwBedrag: number) {
+    setSavingNaam(budgethouder);
+    try {
+      const res = await fetch("/api/attiva/budgetten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budgethouder, jaar, budget: nieuwBedrag }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setBudgetten((prev) => ({ ...prev, [budgethouder]: nieuwBedrag }));
+      setEditingNaam(null);
+    } catch (e) {
+      alert(`Budget opslaan mislukt: ${e instanceof Error ? e.message : "onbekend"}`);
+    } finally {
+      setSavingNaam(null);
+    }
+  }
+
+  function startEdit(naam: string) {
+    const huidig = budgetten[naam] ?? 0;
+    setEditingNaam(naam);
+    setEditValue(huidig > 0 ? String(huidig) : "");
+  }
+
+  function cancelEdit() {
+    setEditingNaam(null);
+    setEditValue("");
+  }
 
   const header = (
     <div className="flex items-center justify-between gap-4">
@@ -150,7 +202,6 @@ export default function DeclaratiesSection() {
 
   const zorgItem = data.perSoort.find(s => s.soort === "Geleverde zorg");
   const loonItem = data.perSoort.find(s => s.soort === "Maandloon");
-  const maxBedrag = data.perPersoon[0]?.bedrag ?? 1;
 
   const vorigZorg = vorigData?.perSoort.find(s => s.soort === "Geleverde zorg");
   const vorigLoon = vorigData?.perSoort.find(s => s.soort === "Maandloon");
@@ -326,47 +377,162 @@ export default function DeclaratiesSection() {
         </div>
       </div>
 
-      {/* Clientenoverzicht */}
+      {/* Clientenoverzicht — uitbetaald + jaarbudget per cliënt */}
       <div className="card">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold text-navy-700">Clientenoverzicht</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Uitbetaald per budgethouder — {jaar}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Uitbetaald vs jaarbudget per budgethouder — {jaar}</p>
           </div>
           <span className="text-sm text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl font-medium">
             {data.perPersoon.length} cliënten
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-10 gap-y-5">
-          {data.perPersoon.map((p, i) => (
-            <div key={p.naam} className="flex items-center gap-3">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
-                style={{ backgroundColor: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
-              >
-                {initials(p.naam)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-semibold text-navy-700 truncate">{p.naam}</span>
-                  <span className="text-sm font-bold text-navy-700 ml-2 flex-shrink-0">{euro(p.bedrag)}</span>
-                </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${(p.bedrag / maxBedrag) * 100}%`,
-                      backgroundColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
-                    }}
-                  />
-                </div>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {data.totaal > 0 ? `${((p.bedrag / data.totaal) * 100).toFixed(1)}% van totaal` : ""}
-                </p>
-              </div>
+        {/* Banner: cliënten zonder budget */}
+        {(() => {
+          const zonderBudget = data.perPersoon.filter(p => !budgetten[p.naam] || budgetten[p.naam] <= 0).length;
+          if (zonderBudget === 0) return null;
+          return (
+            <div className="mb-5 flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2 text-xs text-amber-800">
+              <AlertTriangle size={13} className="text-amber-600 flex-shrink-0" />
+              <span>
+                <strong>{zonderBudget}</strong> {zonderBudget === 1 ? "cliënt heeft" : "cliënten hebben"} nog geen jaarbudget — klik het potlood om er één toe te voegen.
+              </span>
             </div>
-          ))}
+          );
+        })()}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
+          {data.perPersoon.map((p, i) => {
+            const budget = budgetten[p.naam] ?? 0;
+            const hasBudget = budget > 0;
+            const pct = hasBudget ? (p.bedrag / budget) * 100 : 0;
+            const remaining = budget - p.bedrag;
+
+            // Status bepalen
+            let status: { label: string; color: string; bg: string; barColor: string };
+            if (!hasBudget) {
+              status = { label: "Geen budget", color: "text-gray-500", bg: "bg-gray-100", barColor: "#cbd5e1" };
+            } else if (pct >= 100) {
+              status = { label: "Over budget", color: "text-red-700", bg: "bg-red-50", barColor: "#dc2626" };
+            } else if (pct >= 90) {
+              status = { label: "Bijna op", color: "text-orange-700", bg: "bg-orange-50", barColor: "#ea580c" };
+            } else if (pct >= 75) {
+              status = { label: "Let op", color: "text-amber-700", bg: "bg-amber-50", barColor: "#d97706" };
+            } else {
+              status = { label: "Ruim binnen budget", color: "text-emerald-700", bg: "bg-emerald-50", barColor: "#10b981" };
+            }
+
+            const isEditing = editingNaam === p.naam;
+            const isSaving = savingNaam === p.naam;
+
+            return (
+              <div key={p.naam} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-3 hover:border-gray-200 transition-colors">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                  style={{ backgroundColor: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
+                >
+                  {initials(p.naam)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  {/* Naam + status badge */}
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-semibold text-navy-700 truncate" title={p.naam}>{p.naam}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.color} ${status.bg} flex-shrink-0`}>
+                      {status.label}
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, pct)}%`,
+                        backgroundColor: status.barColor,
+                      }}
+                    />
+                  </div>
+
+                  {/* Bedragen-regel */}
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-gray-500">
+                      Verbruikt: <strong className="text-navy-700">{euro(p.bedrag)}</strong>
+                      {hasBudget && <span className="text-gray-400"> · {pct.toFixed(0)}%</span>}
+                    </span>
+                    <span className="text-gray-500">
+                      {hasBudget && (
+                        <>
+                          {remaining >= 0
+                            ? <>Nog beschikbaar: <strong className="text-navy-700">{euro(remaining)}</strong></>
+                            : <>Over budget: <strong className="text-red-700">{euro(Math.abs(remaining))}</strong></>}
+                        </>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Budget-regel met inline edit */}
+                  <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-gray-50">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Jaarbudget:</span>
+                    {isEditing ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const v = parseFloat(editValue.replace(",", "."));
+                          if (!Number.isNaN(v) && v >= 0) saveBudget(p.naam, v);
+                        }}
+                        className="flex items-center gap-1 flex-1"
+                      >
+                        <span className="text-[11px] text-gray-500">€</span>
+                        <input
+                          autoFocus
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          disabled={isSaving}
+                          className="flex-1 max-w-[120px] text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-navy-700 disabled:opacity-50"
+                          placeholder="0"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isSaving}
+                          aria-label="Opslaan"
+                          className="text-emerald-600 hover:bg-emerald-50 rounded p-0.5 disabled:opacity-50"
+                        >
+                          {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={isSaving}
+                          aria-label="Annuleren"
+                          className="text-gray-400 hover:bg-gray-100 rounded p-0.5 disabled:opacity-50"
+                        >
+                          <X size={12} />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <span className="text-[11px] font-bold text-navy-700">
+                          {hasBudget ? euro(budget) : <span className="text-gray-400 font-normal italic">niet ingesteld</span>}
+                        </span>
+                        <button
+                          onClick={() => startEdit(p.naam)}
+                          aria-label={hasBudget ? "Budget aanpassen" : "Budget toevoegen"}
+                          className="text-gray-400 hover:text-navy-700 hover:bg-gray-100 rounded p-0.5 transition-colors"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

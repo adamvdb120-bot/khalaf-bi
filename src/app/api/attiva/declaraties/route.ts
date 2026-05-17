@@ -56,9 +56,10 @@ export async function GET(req: Request) {
     perSoort: Object.entries(perSoort)
       .sort(([, a], [, b]) => b - a)
       .map(([soort, bedrag]) => ({ soort, bedrag: Math.round(bedrag) })),
+    // Alle cliënten teruggeven (geen top-N cap) — nodig voor budget-overzicht
+    // dat álle budgethouders met of zonder budget moet kunnen tonen.
     perPersoon: Object.entries(perPersoon)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 10)
       .map(([naam, bedrag]) => ({ naam, bedrag: Math.round(bedrag) })),
   });
 }
