@@ -1,9 +1,11 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import {
   ArrowUpRight, ArrowDownRight, Minus, TrendingUp, AlertTriangle,
-  Scale, CheckCircle2, Briefcase,
+  Scale, CheckCircle2, Briefcase, HelpCircle,
 } from "lucide-react";
+import WaaromModal, { type WaaromData, type WaaromOorzaak } from "./WaaromModal";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 
@@ -18,6 +20,9 @@ function euro(v: number) {
 }
 function pct(v: number) {
   return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+}
+function euroAbs(v: number) {
+  return `€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
 }
 
 // Aggregate pl rows to totals
@@ -45,6 +50,8 @@ function categoriesByPl(pl: PlRow[], isRevenue: boolean, periodeLimit?: number) 
 }
 
 export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
+  const [waaromOpen, setWaaromOpen] = useState(false);
+
   // Huidige jaar totalen
   const huidig = sumPl(pl);
   const aantalMaanden = huidig.maxPeriod;
@@ -103,6 +110,72 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
     breakevenBuffer > gemKostenPerMaand * 0.05 ? "boven" :
     breakevenBuffer < -gemKostenPerMaand * 0.05 ? "onder" : "rand";
 
+  // ─── Waarom-drilldown data voor het Resultaat KPI ────────────────────────────
+  // We bouwen pas zinvolle data als er ook een vorige periode is om mee te vergelijken.
+  const waaromData = useMemo<WaaromData | null>(() => {
+    if (vorigSamePeriod.omzet === 0 && vorigSamePeriod.kosten === 0) return null;
+
+    const omzetDelta = huidig.omzet - vorigSamePeriod.omzet;
+    const kostenDelta = huidig.kosten - vorigSamePeriod.kosten;
+    const netDelta = huidig.marge - vorigSamePeriod.marge;
+
+    // Top 3 kostenposten die zijn gestegen (positieve delta = slechter voor resultaat)
+    const topKostenStijgers: WaaromOorzaak[] = kostenAfwijkingen
+      .filter(a => a.delta > 0)
+      .sort((a, b) => b.delta - a.delta)
+      .slice(0, 3)
+      .map(a => ({ name: a.name, delta: a.delta, vorig: a.vorig, nu: a.nu }));
+
+    // Top 3 omzetposten die zijn gedaald (negatieve delta = slechter voor resultaat)
+    const topOmzetDalers: WaaromOorzaak[] = omzetAfwijkingen
+      .filter(a => a.delta < 0)
+      .sort((a, b) => a.delta - b.delta)
+      .slice(0, 3)
+      .map(a => ({ name: a.name, delta: a.delta, vorig: a.vorig, nu: a.nu }));
+
+    // ─── Conclusie-zin opbouwen ────────────────────────────────────────────────
+    const isVerslechtering = netDelta < 0;
+    const richting = isVerslechtering ? "gedaald" : "gestegen";
+
+    // Welk effect domineert: omzet, kosten, of beide?
+    const omzetEffect = -omzetDelta;   // negatieve omzet-delta drukt resultaat → omslaan voor "schade"
+    const kostenEffect = kostenDelta;  // positieve kosten-delta drukt resultaat
+    const totaalSchade = Math.abs(omzetEffect) + Math.abs(kostenEffect);
+
+    let hoofdoorzaak = "";
+    if (totaalSchade > 0) {
+      const omzetAandeel = Math.abs(omzetEffect) / totaalSchade;
+      const kostenAandeel = Math.abs(kostenEffect) / totaalSchade;
+      if (kostenAandeel > 0.7) hoofdoorzaak = "vooral hogere kosten";
+      else if (omzetAandeel > 0.7) hoofdoorzaak = "vooral lagere omzet";
+      else hoofdoorzaak = "een combinatie van hogere kosten en lagere omzet";
+    }
+
+    // Concrete oorzaken benoemen (1e kostenstijger, 1e omzetdaler)
+    const concretePunten: string[] = [];
+    if (topKostenStijgers[0]) {
+      concretePunten.push(`${topKostenStijgers[0].name} steeg met ${euroAbs(topKostenStijgers[0].delta)}`);
+    }
+    if (topOmzetDalers[0]) {
+      concretePunten.push(`${topOmzetDalers[0].name} daalde met ${euroAbs(topOmzetDalers[0].delta)}`);
+    }
+
+    const conclusie = isVerslechtering
+      ? `Het resultaat is ${richting} met ${euroAbs(netDelta)} t.o.v. dezelfde periode vorig jaar — ${hoofdoorzaak || "geen duidelijke hoofdoorzaak op postniveau"}.${concretePunten.length > 0 ? ` De grootste posten: ${concretePunten.join(" en ")}.` : ""}`
+      : `Het resultaat is ${richting} met ${euroAbs(netDelta)} t.o.v. dezelfde periode vorig jaar.${concretePunten.length > 0 ? ` Belangrijke verschuivingen: ${concretePunten.join(" en ")}.` : ""}`;
+
+    return {
+      titel: `Waarom is je resultaat ${richting}?`,
+      periode: `Vergelijking: ${jaar} (t/m maand ${aantalMaanden}) vs zelfde periode ${jaar - 1}`,
+      netDelta,
+      omzetDelta,
+      kostenDelta,
+      topKostenStijgers,
+      topOmzetDalers,
+      conclusie,
+    };
+  }, [jaar, aantalMaanden, huidig.omzet, huidig.kosten, huidig.marge, vorigSamePeriod, kostenAfwijkingen, omzetAfwijkingen]);
+
   return (
     <div className="card">
       <div>
@@ -142,6 +215,7 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
             sub={vorigSamePeriod.marge !== 0 ? `Vorig jaar: ${euro(vorigSamePeriod.marge)}` : undefined}
             yoyPct={yoyMarge}
             accent={huidig.marge >= 0 ? "emerald" : "red"}
+            onWaarom={waaromData ? () => setWaaromOpen(true) : undefined}
           />
           <KpiTile
             label="Brutomarge"
@@ -225,13 +299,16 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Waarom-modal — alleen gemount als er data is */}
+      <WaaromModal open={waaromOpen} onClose={() => setWaaromOpen(false)} data={waaromData} />
     </div>
   );
 }
 
 // ─── KPI tile ─────────────────────────────────────────────────────────────────
 function KpiTile({
-  label, value, sub, yoyPct, yoyInverse, yoyAsPp, accent,
+  label, value, sub, yoyPct, yoyInverse, yoyAsPp, accent, onWaarom,
 }: {
   label: string;
   value: string;
@@ -240,6 +317,7 @@ function KpiTile({
   yoyInverse?: boolean;
   yoyAsPp?: boolean;
   accent: "navy" | "gold" | "emerald" | "red";
+  onWaarom?: () => void;
 }) {
   // Alleen de waarde krijgt een subtiele kleur (geen luide borders)
   const valueColor = {
@@ -250,13 +328,23 @@ function KpiTile({
   }[accent];
 
   return (
-    <div className="rounded-xl bg-white border border-gray-100 p-4">
+    <div className="rounded-xl bg-white border border-gray-100 p-4 relative">
       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">{label}</p>
       <p className={`text-2xl font-bold leading-tight ${valueColor}`}>{value}</p>
       <div className="flex items-center justify-between gap-2 mt-2">
         {sub && <p className="text-[10px] text-gray-400 truncate">{sub}</p>}
         {yoyPct !== null && <YoyBadge value={yoyPct} inverse={yoyInverse} asPp={yoyAsPp} />}
       </div>
+      {onWaarom && (
+        <button
+          onClick={onWaarom}
+          className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold text-navy-700 bg-navy-700/5 hover:bg-navy-700/10 px-2 py-1 rounded-md transition-colors"
+          title="Waarom-analyse openen"
+        >
+          <HelpCircle size={11} />
+          Waarom?
+        </button>
+      )}
     </div>
   );
 }
