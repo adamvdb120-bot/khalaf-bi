@@ -9,7 +9,7 @@ import { TrendingUp, TrendingDown, Euro, AlertCircle, RefreshCw, ArrowUpRight, A
 import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
-import AutoInsights from "@/components/portal/AutoInsights";
+import Takenlijst from "./Takenlijst";
 import ActivityFeed from "@/components/portal/ActivityFeed";
 import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
 import ManagementSamenvatting from "@/components/portal/ManagementSamenvatting";
@@ -540,15 +540,8 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
       */}
 
-      {/* 3. Actiepunten — compacte lijst */}
-      {maandData.length > 0 && (
-        <AutoInsights
-          jaar={data.jaar}
-          onNavigate={onNavigate}
-          onInsightsLoaded={setInsightsForPresentation}
-          compact
-        />
-      )}
+      {/* 3. Takenlijst — vervangt de AI-Actiepunten met echte afvinkbare taken */}
+      {maandData.length > 0 && <Takenlijst />}
 
       {/* KPI Cards — alleen tonen bij maand-filter (anders dubbel met Management Samenvatting) */}
       {maand && (
