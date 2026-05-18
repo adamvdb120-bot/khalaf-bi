@@ -89,12 +89,14 @@ export async function GET() {
     // Niet zomaar de meest recente cache — die kan een AI-cache zijn (insights-2025,
     // narratief-2025, omzet-per-klant-..., enz.) zonder pl/crediteuren.
     //
-    // Belangrijk: we slaan caches over die wel bestaan maar (vrijwel) geen pl-data
-    // hebben. Anders pakken we bv. de 2026-cache met 1 maand data en geven we
-    // "Verlies €4.439" terwijl AttivaCharts auto-fallback naar 2025 toont
-    // ("Verlies €48.554"). De twee blokken moeten dezelfde waarheid tonen.
+    // We pakken de cache met de HOOGSTE maand-coverage (maxPeriode) — anders
+    // wint een partial-jaar 2026 cache (jan-only, 5 pl-rijen, verlies €4k)
+    // van een volle 2025-cache (12 maanden, verlies €48k). AttivaCharts doet
+    // auto-fallback naar het jaar mét data; notifications moet hetzelfde
+    // jaar tonen anders raken de twee blokken uit sync.
     const huidigJaar = new Date().getFullYear();
     let cacheRow: { data: unknown; updated_at: string } | null = null;
+    let bestePeriode = 0;
     for (const tryJaar of [huidigJaar, huidigJaar - 1, huidigJaar - 2]) {
       const tryKey = `${tryJaar}-${tryJaar - 1}`;
       const { data: row } = await admin
@@ -105,16 +107,26 @@ export async function GET() {
         .maybeSingle();
       if (!row?.data) continue;
 
-      // Heeft deze cache substantiële pl-data? (>=3 rijen). Anders volgende.
+      // Bepaal maand-coverage: hoogste periode (1-12) in de pl-rijen.
       const cacheData = row.data as {
-        huidig?: { pl?: unknown[] };
-        pl?: unknown[];
+        huidig?: { pl?: PlRow[] };
+        pl?: PlRow[];
       };
-      const plLen = (cacheData.huidig?.pl ?? cacheData.pl ?? []).length;
-      if (plLen < 3) continue;
+      const pl = cacheData.huidig?.pl ?? cacheData.pl ?? [];
+      let maxPeriode = 0;
+      for (const r of pl) {
+        if (r.Period >= 1 && r.Period <= 12 && r.Period > maxPeriode) {
+          maxPeriode = r.Period;
+        }
+      }
 
-      cacheRow = row;
-      break;
+      // Eerste cache met substantiële coverage (>= 3 maanden) wint, tenzij
+      // een volgend jaar nog meer maanden heeft. Dit pakt vol-jaar 2025 boven
+      // partial 2026, maar laat ook 2024 winnen van een lege 2025.
+      if (maxPeriode > bestePeriode) {
+        cacheRow = row;
+        bestePeriode = maxPeriode;
+      }
     }
 
     if (!cacheRow?.data) continue;
