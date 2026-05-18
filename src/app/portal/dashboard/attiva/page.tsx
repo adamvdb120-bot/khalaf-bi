@@ -2,7 +2,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import AttivaTabs from "./AttivaTabs";
-import WatVraagtAandacht from "./WatVraagtAandacht";
 import { requireClientAccess } from "@/lib/portal/access";
 
 export default async function AttivaDashboard() {
@@ -43,9 +42,6 @@ export default async function AttivaDashboard() {
           </p>
         </div>
       </div>
-
-      {/* "Wat moet ik deze week doen?" — bovenaan, tab-onafhankelijk. */}
-      <WatVraagtAandacht />
 
       <AttivaTabs isConnected={isConnected} />
     </div>

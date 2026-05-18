@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Zap, CheckCircle2, AlertCircle, AlertTriangle, Info,
@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 
 const VISIBLE_DEFAULT = 3;
+
+interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
+interface CrediteurRow { Name: string; Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number }
 
 interface Notification {
   id: string;
@@ -31,8 +34,30 @@ const TYPE_ICONS = {
   client: UserX,
 };
 
-export default function WatVraagtAandacht() {
-  const [notifications, setNotifications] = useState<Notification[] | null>(null);
+const SEVERITY_RANK = { alarm: 0, attention: 1, info: 2 } as const;
+const TYPE_RANK: Record<Notification["type"], number> = {
+  exact: 0, marge: 1, budget: 2, crediteur: 3, client: 4, data: 5, info: 6,
+};
+
+function euro(v: number) {
+  return `€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
+}
+
+interface Props {
+  /**
+   * P&L-rijen van het jaar dat de gebruiker op het dashboard ziet.
+   * Wanneer aanwezig berekenen we marge-alerts uit deze data — zo
+   * tonen WatVraagtAandacht en de KPI-tegels gegarandeerd hetzelfde
+   * verlies/winst-bedrag. Zonder pl valt de marge-check op de
+   * notifications-API terug.
+   */
+  pl?: PlRow[];
+  /** Aged crediteurenrijen — zelfde rationale: één bron voor de UI. */
+  crediteuren?: CrediteurRow[];
+}
+
+export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
+  const [apiNotifications, setApiNotifications] = useState<Notification[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
@@ -43,13 +68,94 @@ export default function WatVraagtAandacht() {
         const res = await fetch("/api/notifications");
         if (!res.ok) return;
         const json = await res.json();
-        if (!cancelled) setNotifications(json.notifications ?? []);
+        if (!cancelled) setApiNotifications(json.notifications ?? []);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     load();
   }, []);
+
+  // ─── Lokaal berekende meldingen uit door-de-parent doorgegeven data ────
+  // Deze waarden komen uit dezelfde fetch (/api/exact/data) die ook de
+  // KPI-tegels voedt — daardoor kunnen ze nooit meer afwijken.
+  const localAlerts = useMemo<Notification[]>(() => {
+    const alerts: Notification[] = [];
+
+    // Marge-alert
+    if (pl && pl.length > 0) {
+      const omzet = pl.filter(r => r.IsRevenue).reduce((s, r) => s + r.Amount, 0);
+      const kosten = pl.filter(r => !r.IsRevenue).reduce((s, r) => s + r.Amount, 0);
+      const marge = omzet - kosten;
+      const margePct = omzet > 0 ? (marge / omzet) * 100 : 0;
+
+      if (marge < 0) {
+        alerts.push({
+          id: "marge-neg-attiva",
+          type: "marge",
+          severity: "alarm",
+          titel: "Negatief jaarresultaat",
+          beschrijving: `Verlies van ${euro(Math.abs(marge))} — kosten overstijgen omzet`,
+          href: "/portal/dashboard/attiva#sectie-marge",
+          klant: "Attiva Zorg",
+          bedrag: `${margePct.toFixed(1)}%`,
+        });
+      } else if (margePct < 5 && margePct > 0 && omzet > 50000) {
+        alerts.push({
+          id: "marge-low-attiva",
+          type: "marge",
+          severity: "attention",
+          titel: "Zeer dunne marge",
+          beschrijving: `Brutomarge is slechts ${margePct.toFixed(1)}% — onder kritische drempel`,
+          href: "/portal/dashboard/attiva#sectie-marge",
+          klant: "Attiva Zorg",
+          bedrag: `${margePct.toFixed(1)}%`,
+        });
+      }
+    }
+
+    // Crediteuren-alert
+    if (crediteuren && crediteuren.length > 0) {
+      const totaal90Plus = crediteuren.reduce((s, c) => s + (c.Age90Plus ?? 0), 0);
+      if (totaal90Plus > 5000) {
+        const topUrgent = crediteuren
+          .filter(c => (c.Age90Plus ?? 0) > 0)
+          .sort((a, b) => (b.Age90Plus ?? 0) - (a.Age90Plus ?? 0))[0];
+        alerts.push({
+          id: "cred-attiva",
+          type: "crediteur",
+          severity: totaal90Plus > 15000 ? "alarm" : "attention",
+          titel: `${euro(totaal90Plus)} aan crediteuren staat >90 dagen open`,
+          beschrijving: topUrgent
+            ? `Grootste: ${topUrgent.Name} (${euro(topUrgent.Age90Plus)})`
+            : "Bekijk welke leveranciers contact nodig hebben",
+          href: "/portal/dashboard/attiva?tab=crediteuren",
+          klant: "Attiva Zorg",
+          bedrag: euro(totaal90Plus),
+        });
+      }
+    }
+
+    return alerts;
+  }, [pl, crediteuren]);
+
+  // ─── Combineren: lokale alerts hebben voorrang boven dezelfde types uit API ──
+  const notifications = useMemo<Notification[]>(() => {
+    if (!apiNotifications) return [];
+
+    // Welke types berekenen we lokaal? Filter die uit API-output zodat we ze
+    // niet dubbel tonen met (mogelijk) andere getallen.
+    const lokaleTypes = new Set(localAlerts.map(a => a.type));
+    const apiFiltered = apiNotifications.filter(n => !lokaleTypes.has(n.type));
+
+    const combined = [...localAlerts, ...apiFiltered];
+    combined.sort((a, b) => {
+      const sev = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
+      if (sev !== 0) return sev;
+      return TYPE_RANK[a.type] - TYPE_RANK[b.type];
+    });
+    return combined;
+  }, [apiNotifications, localAlerts]);
 
   // Loading: kleine skeleton zodat de pagina niet schokt zodra data laadt
   if (loading) {
@@ -65,7 +171,7 @@ export default function WatVraagtAandacht() {
   }
 
   // Lege state — geen urgente acties
-  if (!notifications || notifications.length === 0) {
+  if (notifications.length === 0) {
     return (
       <div className="card flex items-center gap-3 py-4 px-5 border-l-4 border-l-emerald-500">
         <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -87,9 +193,6 @@ export default function WatVraagtAandacht() {
   }[hoogsteSeverity];
 
   const alarmCount = notifications.filter(n => n.severity === "alarm").length;
-
-  // Standaard tonen we maximaal de eerste 3 (al gesorteerd op prioriteit).
-  // Klikken op "Bekijk alle…" toont de rest. Voorkomt dat de kaart te druk wordt.
   const hasMore = notifications.length > VISIBLE_DEFAULT;
   const zichtbaar = expanded || !hasMore ? notifications : notifications.slice(0, VISIBLE_DEFAULT);
 

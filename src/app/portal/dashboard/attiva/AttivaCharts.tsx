@@ -23,6 +23,7 @@ import ExportButton from "@/components/portal/ExportButton";
 import { CacheBadge } from "@/components/portal/CacheBadge";
 import { Presentation } from "lucide-react";
 import { CLIENTS } from "@/lib/clients/config";
+import WatVraagtAandacht from "./WatVraagtAandacht";
 
 const ATTIVA_FEATURES = CLIENTS.attiva.features;
 
@@ -437,6 +438,10 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
 
   return (
     <div className="space-y-6">
+      {/* "Wat vraagt aandacht?" — gebruikt dezelfde pl/crediteuren als de
+          KPI-tegels eronder. Garandeert één waarheid. */}
+      <WatVraagtAandacht pl={data.pl ?? []} crediteuren={data.crediteuren ?? []} />
+
       {/* Gecombineerde filterbalk */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
