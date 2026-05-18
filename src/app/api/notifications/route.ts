@@ -88,6 +88,11 @@ export async function GET() {
     // Zoek de FINANCIËLE cache (key-format "YYYY-YYYY", bv "2025-2024").
     // Niet zomaar de meest recente cache — die kan een AI-cache zijn (insights-2025,
     // narratief-2025, omzet-per-klant-..., enz.) zonder pl/crediteuren.
+    //
+    // Belangrijk: we slaan caches over die wel bestaan maar (vrijwel) geen pl-data
+    // hebben. Anders pakken we bv. de 2026-cache met 1 maand data en geven we
+    // "Verlies €4.439" terwijl AttivaCharts auto-fallback naar 2025 toont
+    // ("Verlies €48.554"). De twee blokken moeten dezelfde waarheid tonen.
     const huidigJaar = new Date().getFullYear();
     let cacheRow: { data: unknown; updated_at: string } | null = null;
     for (const tryJaar of [huidigJaar, huidigJaar - 1, huidigJaar - 2]) {
@@ -98,10 +103,18 @@ export async function GET() {
         .eq("client_name", slug)
         .eq("cache_key", tryKey)
         .maybeSingle();
-      if (row?.data) {
-        cacheRow = row;
-        break;
-      }
+      if (!row?.data) continue;
+
+      // Heeft deze cache substantiële pl-data? (>=3 rijen). Anders volgende.
+      const cacheData = row.data as {
+        huidig?: { pl?: unknown[] };
+        pl?: unknown[];
+      };
+      const plLen = (cacheData.huidig?.pl ?? cacheData.pl ?? []).length;
+      if (plLen < 3) continue;
+
+      cacheRow = row;
+      break;
     }
 
     if (!cacheRow?.data) continue;

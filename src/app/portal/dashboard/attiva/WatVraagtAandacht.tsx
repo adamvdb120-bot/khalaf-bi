@@ -139,7 +139,7 @@ export default function WatVraagtAandacht() {
                 <p className="text-xs text-gray-600 leading-snug">{n.beschrijving}</p>
               </div>
               {n.bedrag && (
-                <span className={`text-sm font-bold ${sev.titelKleur} flex-shrink-0`}>
+                <span className={`text-xs font-semibold ${sev.titelKleur} opacity-80 flex-shrink-0 self-center`}>
                   {n.bedrag}
                 </span>
               )}

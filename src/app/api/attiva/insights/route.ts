@@ -26,8 +26,18 @@ export async function GET(req: Request) {
 
   const admin = createAdminClient();
   const cacheKey = `insights-${jaar}`;
+  const dataKey = `${jaar}-${jaar - 1}`;
 
-  // Cache check
+  // Eerst onderliggende financiele data ophalen — updated_at nodig om te zien
+  // of we de AI-cache nog mogen vertrouwen.
+  const { data: dataRow } = await admin
+    .from("exact_data_cache")
+    .select("data, updated_at")
+    .eq("client_name", "attiva")
+    .eq("cache_key", dataKey)
+    .single();
+
+  // Cache check — AI-cache alleen geldig als hij nieuwer is dan de data zelf
   if (!refresh) {
     const { data: cached } = await admin
       .from("exact_data_cache")
@@ -37,20 +47,14 @@ export async function GET(req: Request) {
       .single();
     if (cached) {
       const age = Date.now() - new Date(cached.updated_at).getTime();
-      if (age < CACHE_TTL_MS) {
+      const cacheVers = age < CACHE_TTL_MS;
+      const dataIsNieuwer = dataRow
+        && new Date(dataRow.updated_at).getTime() > new Date(cached.updated_at).getTime();
+      if (cacheVers && !dataIsNieuwer) {
         return NextResponse.json({ insights: cached.data, cached: true, age_seconds: Math.round(age / 1000) });
       }
     }
   }
-
-  // Haal de financiele data op
-  const dataKey = `${jaar}-${jaar - 1}`;
-  const { data: dataRow } = await admin
-    .from("exact_data_cache")
-    .select("data")
-    .eq("client_name", "attiva")
-    .eq("cache_key", dataKey)
-    .single();
 
   if (!dataRow) {
     return NextResponse.json({
