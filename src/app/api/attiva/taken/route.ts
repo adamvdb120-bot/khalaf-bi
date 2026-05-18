@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { checkClientAccess } from "@/lib/portal/access";
 
 export interface TaakRow {
   id: string;
@@ -21,9 +21,8 @@ const CLIENT_SLUG = "attiva";
 // GET /api/attiva/taken[?status=open]
 // Returnt taken voor de attiva-klant, optioneel gefilterd op status.
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  const access = await checkClientAccess(CLIENT_SLUG);
+  if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
   const url = new URL(req.url);
   const statusFilter = url.searchParams.get("status");
@@ -49,9 +48,8 @@ export async function GET(req: Request) {
 // Body: { titel, beschrijving?, bedrag?, source? }
 // Maakt een nieuwe taak aan in status 'open'.
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  const access = await checkClientAccess(CLIENT_SLUG);
+  if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
   const body = await req.json().catch(() => null) as {
     titel?: string;

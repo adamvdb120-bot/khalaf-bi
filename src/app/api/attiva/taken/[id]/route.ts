@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { checkClientAccess } from "@/lib/portal/access";
 import type { TaakRow } from "../route";
 
 const CLIENT_SLUG = "attiva";
@@ -12,9 +12,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  const access = await checkClientAccess(CLIENT_SLUG);
+  if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "ID ontbreekt" }, { status: 400 });
@@ -73,9 +72,8 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  const access = await checkClientAccess(CLIENT_SLUG);
+  if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "ID ontbreekt" }, { status: 400 });

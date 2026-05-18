@@ -71,6 +71,38 @@ export async function getCurrentClientConfig(): Promise<ClientConfig | null> {
 }
 
 /**
+ * API-variant van requireClientAccess: returnt UserAccess als de gebruiker
+ * toegang heeft, anders `null` — geen redirect. Bedoeld voor route handlers
+ * die zelf een 401/403 willen returnen i.p.v. een redirect te triggeren.
+ */
+export async function checkClientAccess(slug: string): Promise<UserAccess | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, role, client_slug")
+    .eq("id", user.id)
+    .single();
+
+  const role = (profile?.role as "admin" | "client" | "user") ?? "user";
+  const clientSlug = profile?.client_slug ?? null;
+
+  const access: UserAccess = {
+    userId: user.id,
+    email: user.email ?? "",
+    fullName: profile?.full_name ?? null,
+    role,
+    clientSlug,
+  };
+
+  if (role === "admin") return access;
+  if (role === "client" && clientSlug === slug) return access;
+  return null;
+}
+
+/**
  * Vereist dat de gebruiker een geldig klantdashboard heeft (admin of klant met
  * bekende slug). Anders: terug naar /portal, waar de "geen toegang"-kaart
  * verschijnt. Gebruik dit voor portal-routes die niet bedoeld zijn voor
