@@ -76,16 +76,17 @@ export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
   const [apiNotifications, setApiNotifications] = useState<Notification[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
-  // IDs van meldingen die in deze sessie zijn omgezet naar een taak. In-memory:
-  // refresh reset hem. Voorkomt dubbel-klikken; geen permanente dedup tegen
-  // verdere refreshes (taak kan binnen de takenlijst worden afgevinkt).
-  const [createdIds, setCreatedIds] = useState<Set<string>>(new Set());
+  // Meldingen die in deze sessie of een eerdere zijn omgezet naar een taak.
+  // Waarde 'new' = net aangemaakt; 'duplicate' = bestond al (server-side dedup).
+  // In-memory: refresh leegt de map, maar de API stuurt nog steeds duplicate=true
+  // bij een tweede klik, dus de UI kan dat correct laten zien.
+  const [taakStatus, setTaakStatus] = useState<Map<string, "new" | "duplicate">>(new Map());
   const [creatingId, setCreatingId] = useState<string | null>(null);
 
   async function createTask(n: Notification, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (createdIds.has(n.id) || creatingId) return;
+    if (taakStatus.has(n.id) || creatingId) return;
     setCreatingId(n.id);
     try {
       const res = await fetch("/api/attiva/taken", {
@@ -99,9 +100,10 @@ export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setCreatedIds((prev) => {
-        const next = new Set(prev);
-        next.add(n.id);
+      const json = await res.json();
+      setTaakStatus((prev) => {
+        const next = new Map(prev);
+        next.set(n.id, json.duplicate ? "duplicate" : "new");
         return next;
       });
     } catch (err) {
@@ -297,28 +299,45 @@ export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
                 </span>
               )}
               {/* +Taak knop — converteert melding naar takenlijst-item */}
-              {createdIds.has(n.id) ? (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded flex-shrink-0 self-center">
-                  <Check size={11} />
-                  Aangemaakt
-                </span>
-              ) : (
-                <button
-                  onClick={(e) => createTask(n, e)}
-                  disabled={creatingId === n.id}
-                  title="Maak hier een taak van"
-                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 hover:text-navy-700 bg-gray-50 hover:bg-navy-700/10 px-2 py-1 rounded flex-shrink-0 self-center transition-colors disabled:opacity-50"
-                >
-                  {creatingId === n.id ? (
-                    <Loader2 size={11} className="animate-spin" />
-                  ) : (
-                    <>
-                      <Plus size={11} />
-                      Taak
-                    </>
-                  )}
-                </button>
-              )}
+              {(() => {
+                const status = taakStatus.get(n.id);
+                if (status === "new") {
+                  return (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded flex-shrink-0 self-center">
+                      <Check size={11} />
+                      Aangemaakt
+                    </span>
+                  );
+                }
+                if (status === "duplicate") {
+                  return (
+                    <span
+                      title="Er staat al een open taak met deze titel"
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded flex-shrink-0 self-center"
+                    >
+                      <Info size={11} />
+                      Bestaat al
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    onClick={(e) => createTask(n, e)}
+                    disabled={creatingId === n.id}
+                    title="Maak hier een taak van"
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 hover:text-navy-700 bg-gray-50 hover:bg-navy-700/10 px-2 py-1 rounded flex-shrink-0 self-center transition-colors disabled:opacity-50"
+                  >
+                    {creatingId === n.id ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : (
+                      <>
+                        <Plus size={11} />
+                        Taak
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
               <ArrowRight size={14} className="text-gray-400 group-hover:text-navy-700 group-hover:translate-x-1 transition-all flex-shrink-0 self-center" />
             </Link>
           );

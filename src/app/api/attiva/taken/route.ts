@@ -63,19 +63,40 @@ export async function POST(req: Request) {
   }
 
   const admin = createAdminClient();
+  const titel = body.titel.trim().slice(0, 200);
+  const source = body.source?.trim() || "manual";
+
+  // Dedup voor auto-gegenereerde taken (source='attention'): als er al een
+  // open taak bestaat met exact dezelfde titel, retourneer die ipv een dubbel
+  // aan te maken. Voor handmatige taken (source='manual') blokkeren we niets
+  // — als jij twee keer "Bel A. Duale" wilt aanmaken, mag dat.
+  if (source === "attention") {
+    const { data: bestaand } = await admin
+      .from("client_taken")
+      .select("*")
+      .eq("client_slug", CLIENT_SLUG)
+      .eq("titel", titel)
+      .eq("source", "attention")
+      .eq("status", "open")
+      .maybeSingle();
+    if (bestaand) {
+      return NextResponse.json({ taak: bestaand as TaakRow, duplicate: true });
+    }
+  }
+
   const { data, error } = await admin
     .from("client_taken")
     .insert({
       client_slug: CLIENT_SLUG,
-      titel: body.titel.trim().slice(0, 200),
+      titel,
       beschrijving: body.beschrijving?.trim() || null,
       bedrag: typeof body.bedrag === "number" ? body.bedrag : null,
-      source: body.source?.trim() || "manual",
+      source,
       status: "open",
     })
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ taak: data as TaakRow });
+  return NextResponse.json({ taak: data as TaakRow, duplicate: false });
 }
