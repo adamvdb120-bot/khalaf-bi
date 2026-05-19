@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkClientAccess } from "@/lib/portal/access";
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 uur — refresh 2x/dag
 
@@ -16,9 +16,8 @@ export interface Insight {
 }
 
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  const access = await checkClientAccess("attiva");
+  if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
   const url = new URL(req.url);
   const jaar = parseInt(url.searchParams.get("jaar") ?? new Date().getFullYear().toString(), 10);

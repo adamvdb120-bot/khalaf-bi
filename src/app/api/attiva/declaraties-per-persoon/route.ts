@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { checkClientAccess } from "@/lib/portal/access";
 
 // Geeft per budgethouder een rij met totaal én perMaand[12] voor het opgegeven
 // jaar. Bedoeld voor de "Waarom?"-cliënt-drilldown bij PGB-omzetcategorieën.
@@ -13,9 +13,8 @@ import { createClient } from "@/lib/supabase/server";
 // onderscheid is administratief; voor cliënt-beweging telt het totaal.
 
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  const access = await checkClientAccess("attiva");
+  if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
   const url = new URL(req.url);
   const jaarParam = url.searchParams.get("jaar");
