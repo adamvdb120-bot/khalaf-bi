@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Zap, CheckCircle2, AlertCircle, AlertTriangle, Info,
   Wallet, TrendingDown, Plug, Database, Target, UserX,
-  ArrowRight, ChevronDown, ChevronUp,
+  ArrowRight, ChevronDown, ChevronUp, Plus, Check, Loader2,
 } from "lucide-react";
 
 const VISIBLE_DEFAULT = 3;
@@ -43,6 +43,22 @@ function euro(v: number) {
   return `€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
 }
 
+// Probeert een €-bedrag te extraheren uit een notification.bedrag string.
+// "€ 8.069" → 8069. "+€ 25.600" → 25600. "-€ 1.234,56" → -1234.56.
+// "-7.3%" → null (geen euro-amount).
+function parseBedrag(s: string | undefined): number | null {
+  if (!s) return null;
+  if (!s.includes("€")) return null;
+  const m = s.match(/€\s*([+-−]?\s*[\d.,]+)/);
+  if (!m) return null;
+  const sign = /[-−]/.test(m[1]) ? -1 : 1;
+  const digits = m[1].replace(/[+\-−\s]/g, "");
+  // NL-format: '.' = thousand separator, ',' = decimal. Strip duizendtallen,
+  // vervang komma door punt voor parseFloat.
+  const num = parseFloat(digits.replace(/\./g, "").replace(/,/g, "."));
+  return isNaN(num) ? null : sign * num;
+}
+
 interface Props {
   /**
    * P&L-rijen van het jaar dat de gebruiker op het dashboard ziet.
@@ -60,6 +76,40 @@ export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
   const [apiNotifications, setApiNotifications] = useState<Notification[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  // IDs van meldingen die in deze sessie zijn omgezet naar een taak. In-memory:
+  // refresh reset hem. Voorkomt dubbel-klikken; geen permanente dedup tegen
+  // verdere refreshes (taak kan binnen de takenlijst worden afgevinkt).
+  const [createdIds, setCreatedIds] = useState<Set<string>>(new Set());
+  const [creatingId, setCreatingId] = useState<string | null>(null);
+
+  async function createTask(n: Notification, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (createdIds.has(n.id) || creatingId) return;
+    setCreatingId(n.id);
+    try {
+      const res = await fetch("/api/attiva/taken", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titel: n.titel,
+          beschrijving: n.beschrijving,
+          bedrag: parseBedrag(n.bedrag),
+          source: "attention",
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setCreatedIds((prev) => {
+        const next = new Set(prev);
+        next.add(n.id);
+        return next;
+      });
+    } catch (err) {
+      alert(`Taak aanmaken mislukt: ${err instanceof Error ? err.message : "onbekend"}`);
+    } finally {
+      setCreatingId(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -246,7 +296,30 @@ export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
                   {n.bedrag}
                 </span>
               )}
-              <ArrowRight size={14} className="text-gray-400 group-hover:text-navy-700 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
+              {/* +Taak knop — converteert melding naar takenlijst-item */}
+              {createdIds.has(n.id) ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded flex-shrink-0 self-center">
+                  <Check size={11} />
+                  Aangemaakt
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => createTask(n, e)}
+                  disabled={creatingId === n.id}
+                  title="Maak hier een taak van"
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 hover:text-navy-700 bg-gray-50 hover:bg-navy-700/10 px-2 py-1 rounded flex-shrink-0 self-center transition-colors disabled:opacity-50"
+                >
+                  {creatingId === n.id ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <>
+                      <Plus size={11} />
+                      Taak
+                    </>
+                  )}
+                </button>
+              )}
+              <ArrowRight size={14} className="text-gray-400 group-hover:text-navy-700 group-hover:translate-x-1 transition-all flex-shrink-0 self-center" />
             </Link>
           );
         })}
