@@ -378,7 +378,8 @@ export default function DeclaratiesSection() {
       </div>
 
       {/* Clientenoverzicht — uitbetaald + jaarbudget per cliënt */}
-      <div className="card">
+      {/* id voor deep-link uit Wat-vraagt-aandacht budget-meldingen */}
+      <div id="clientenoverzicht" className="card scroll-mt-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold text-navy-700">Clientenoverzicht</h3>

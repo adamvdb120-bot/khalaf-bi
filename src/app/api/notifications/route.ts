@@ -259,13 +259,23 @@ export async function GET() {
     // Budget-alerts
     const overBudget: { naam: string; over: number }[] = [];
     const bijnaOpBudget: { naam: string; pct: number }[] = [];
+    const namenMetBudget = new Set<string>();
     for (const b of budgetten) {
       if (!b.budgethouder || !b.budget || b.budget <= 0) continue;
+      namenMetBudget.add(b.budgethouder);
       const v = verbruikHuidig[b.budgethouder] ?? 0;
       const pct = (v / b.budget) * 100;
       if (pct >= 100) overBudget.push({ naam: b.budgethouder, over: v - b.budget });
       else if (pct >= 90) bijnaOpBudget.push({ naam: b.budgethouder, pct });
     }
+
+    // Cliënten met materieel verbruik (>= €1.000) maar geen ingesteld budget —
+    // monitoring is daar effectief uitgeschakeld. Drempel houdt eenmalige
+    // boekingen of proeffacturen buiten de melding.
+    const zonderBudgetActief = Object.entries(verbruikHuidig)
+      .filter(([naam, v]) => !namenMetBudget.has(naam) && v >= 1000)
+      .map(([naam, v]) => ({ naam, verbruik: v }))
+      .sort((a, b) => b.verbruik - a.verbruik);
 
     if (overBudget.length > 0) {
       const sorted = overBudget.sort((a, b) => b.over - a.over);
@@ -275,7 +285,7 @@ export async function GET() {
         severity: "alarm",
         titel: `${overBudget.length} ${overBudget.length === 1 ? "cliënt is" : "cliënten zijn"} over budget`,
         beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (+${euro(c.over)})`).join(", "),
-        href: "/portal/dashboard/attiva?tab=declaraties",
+        href: "/portal/dashboard/attiva?tab=declaraties#clientenoverzicht",
         klant: "Attiva Zorg",
       });
     }
@@ -288,7 +298,24 @@ export async function GET() {
         severity: "attention",
         titel: `${bijnaOpBudget.length} ${bijnaOpBudget.length === 1 ? "cliënt" : "cliënten"} bijna op jaarbudget`,
         beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (${c.pct.toFixed(0)}%)`).join(", "),
-        href: "/portal/dashboard/attiva?tab=declaraties",
+        href: "/portal/dashboard/attiva?tab=declaraties#clientenoverzicht",
+        klant: "Attiva Zorg",
+      });
+    }
+
+    if (zonderBudgetActief.length > 0) {
+      const topNamen = zonderBudgetActief.slice(0, 3).map(c => c.naam);
+      const extra = zonderBudgetActief.length - 3;
+      const namenTekst = extra > 0
+        ? `${topNamen.join(", ")} en ${extra} ${extra === 1 ? "andere" : "anderen"}`
+        : topNamen.join(", ");
+      notifications.push({
+        id: `budget-missing-${slug}`,
+        type: "budget",
+        severity: "attention",
+        titel: `${zonderBudgetActief.length} ${zonderBudgetActief.length === 1 ? "cliënt heeft" : "cliënten hebben"} geen jaarbudget`,
+        beschrijving: `${namenTekst} — stel budgetten in voor goede monitoring.`,
+        href: "/portal/dashboard/attiva?tab=declaraties#clientenoverzicht",
         klant: "Attiva Zorg",
       });
     }
