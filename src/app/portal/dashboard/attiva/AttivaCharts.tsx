@@ -441,15 +441,9 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
 
   return (
     <div className="space-y-6">
-      {/* "Wat vraagt aandacht?" — gebruikt dezelfde pl/crediteuren als de
-          KPI-tegels eronder. Garandeert één waarheid. */}
-      <WatVraagtAandacht
-        pl={data.pl ?? []}
-        crediteuren={data.crediteuren ?? []}
-        onTaskCreated={() => setTakenRefreshKey((v) => v + 1)}
-      />
-
-      {/* Gecombineerde filterbalk */}
+      {/* Gecombineerde filterbalk — staat bewust bovenaan zodat de gebruiker
+          ziet dat alle blokken hieronder (aandacht, KPI's, grafieken) door
+          deze periode-keuze worden gevoed. */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Jaar pills */}
@@ -522,6 +516,15 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           </button>
         </div>
       )}
+
+      {/* "Wat vraagt aandacht?" — komt na de filterbalk zodat duidelijk is
+          dat deze meldingen over de geselecteerde periode gaan. Gebruikt
+          dezelfde pl/crediteuren als de KPI-tegels eronder. */}
+      <WatVraagtAandacht
+        pl={data.pl ?? []}
+        crediteuren={data.crediteuren ?? []}
+        onTaskCreated={() => setTakenRefreshKey((v) => v + 1)}
+      />
 
       <div id="attiva-financieel-export" className="space-y-6 bg-white">
       {/* 1. Management samenvatting — HOOFDSECTIE: harde cijfers met YoY */}
