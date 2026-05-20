@@ -258,10 +258,21 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
         uitleg: `Opgebouwd uit ${formatSigned(omzetDelta)} omzet en ${formatSigned(-kostenDelta)} kosten-effect (kosten zijn omgekeerd: een stijging drukt het resultaat).`,
         isPositief: netDelta >= 0,
       },
+      // Waterfall: vorig resultaat + omzetDelta + (-kostenDelta) = huidig resultaat.
+      // Kosten-effect wordt gespiegeld: kosten omhoog = negatief voor resultaat.
+      waterfall: {
+        titel: "Hoe is dit opgebouwd?",
+        start: { label: `Resultaat ${jaar - 1}`, waarde: vorigSamePeriod.marge },
+        effecten: [
+          { label: "Omzet-effect", waarde: omzetDelta },
+          { label: "Kosten-effect", waarde: -kostenDelta },
+        ],
+        eind: { label: `Resultaat ${jaar}`, waarde: huidig.marge },
+      },
       sections,
       conclusie,
     };
-  }, [heeftVorigeData, huidig.omzet, huidig.kosten, huidig.marge, vorigSamePeriod, kostenAfwijkingen, omzetAfwijkingen, periodeLabel]);
+  }, [heeftVorigeData, huidig.omzet, huidig.kosten, huidig.marge, vorigSamePeriod, kostenAfwijkingen, omzetAfwijkingen, periodeLabel, jaar]);
 
   // ─── Omzet ──────────────────────────────────────────────────────────────────
   const omzetWaarom = useMemo<WaaromData | null>(() => {

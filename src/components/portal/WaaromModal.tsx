@@ -32,10 +32,29 @@ export interface WaaromHoofdMetric {
   isPositief: boolean;      // bepaalt groen vs rood vs neutraal
 }
 
+/**
+ * Optionele waterfall-uitleg: visualiseert hoe start → effecten → eind
+ * optellen. Voorbeeld voor Resultaat:
+ *   start  = vorig jaar resultaat
+ *   effect = omzet-effect (positief als omzet steeg)
+ *   effect = kosten-effect (positief als kosten daalden — dus gespiegeld
+ *            t.o.v. kostenDelta)
+ *   eind   = dit jaar resultaat
+ *
+ * Wiskundige invariant: start + Σ effecten = eind.
+ */
+export interface WaaromWaterfall {
+  titel: string;                                         // bv. "Hoe is dit opgebouwd?"
+  start: { label: string; waarde: number };              // beginpunt (navy)
+  effecten: { label: string; waarde: number }[];         // delta's, kleur volgt teken
+  eind: { label: string; waarde: number };               // eindpunt (navy)
+}
+
 export interface WaaromData {
   titel: string;                       // bv. "Waarom is je resultaat gedaald?"
   periode: string;                     // bv. "Vergelijking: 2025 (t/m maand 12) vs zelfde periode 2024"
   hoofdMetric?: WaaromHoofdMetric;     // optioneel; bij Resultaat verklarend, bij Omzet/Kosten cijfer-zelf
+  waterfall?: WaaromWaterfall;         // optioneel; alleen bij Resultaat (samengestelde metric)
   sections: WaaromSection[];           // 0..N oorzaak-secties
   conclusie: string;                   // 1-2 zinnen klare-taal samenvatting
 }
@@ -128,6 +147,9 @@ export default function WaaromModal({ open, onClose, data }: Props) {
             </div>
           )}
 
+          {/* Waterfall: visueel 'hoe is dit opgebouwd?' (alleen bij samengestelde metrics) */}
+          {data.waterfall && <WaterfallBlock data={data.waterfall} />}
+
           {/* Secties */}
           {data.sections.map((section, idx) => (
             section.oorzaken.length > 0 && (
@@ -182,6 +204,64 @@ export default function WaaromModal({ open, onClose, data }: Props) {
             Sluiten
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WaterfallBlock({ data }: { data: WaaromWaterfall }) {
+  // Schaal de bar-breedte tegen de grootste absolute waarde in het hele blokje.
+  // 80% van de breedte als max — laat lucht voor het bedrag rechts.
+  const alleWaarden = [
+    Math.abs(data.start.waarde),
+    ...data.effecten.map(e => Math.abs(e.waarde)),
+    Math.abs(data.eind.waarde),
+  ];
+  const maxAbs = Math.max(...alleWaarden, 1);
+
+  type Rij = { label: string; waarde: number; type: "start" | "effect" | "eind" };
+  const rijen: Rij[] = [
+    { label: data.start.label, waarde: data.start.waarde, type: "start" },
+    ...data.effecten.map(e => ({ label: e.label, waarde: e.waarde, type: "effect" as const })),
+    { label: data.eind.label, waarde: data.eind.waarde, type: "eind" },
+  ];
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-4">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">
+        {data.titel}
+      </p>
+      <div className="space-y-2">
+        {rijen.map((rij, i) => {
+          const barWidth = (Math.abs(rij.waarde) / maxAbs) * 80; // max 80%
+          const barColor =
+            rij.type === "start" || rij.type === "eind"
+              ? "bg-navy-700"
+              : rij.waarde >= 0
+              ? "bg-emerald-500"
+              : "bg-red-500";
+          const bedragColor =
+            rij.type === "start" || rij.type === "eind"
+              ? "text-navy-700"
+              : rij.waarde >= 0
+              ? "text-emerald-700"
+              : "text-red-700";
+          const isEindRij = i === rijen.length - 1;
+          return (
+            <div key={i} className={`flex items-center gap-3 ${isEindRij ? "pt-2 border-t border-gray-100" : ""}`}>
+              <span className="w-36 text-xs text-gray-600 flex-shrink-0">{rij.label}</span>
+              <div className="flex-1 h-5 bg-gray-50 rounded relative">
+                <div
+                  className={`h-full rounded ${barColor} transition-all`}
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+              <span className={`w-28 text-right text-sm font-bold flex-shrink-0 ${bedragColor}`}>
+                {euro(rij.waarde)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
