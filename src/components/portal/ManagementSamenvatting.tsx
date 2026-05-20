@@ -27,10 +27,6 @@ function pct(v: number) {
 function euroAbs(v: number) {
   return `€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
 }
-function formatSigned(v: number) {
-  const sign = v < 0 ? "−" : v > 0 ? "+" : "";
-  return `${sign}€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
-}
 
 // Aggregate pl rows to totals
 function sumPl(pl: PlRow[]) {
@@ -249,30 +245,42 @@ export default function ManagementSamenvatting({ jaar, pl, vorigPl }: Props) {
       { label: "Grootste omzetdalers", iconDirection: "down", tone: "amber", oorzaken: topOmzetDalers },
     ];
 
+    // Korte feitelijke uitleg-zin: noemt simpel de twee bewegingen die het
+    // verschil opbouwen. Geen technische disclaimer over 'omgekeerde kosten' —
+    // de waterfall eronder maakt dat visueel duidelijk.
+    const uitlegDelen: string[] = [];
+    if (Math.abs(omzetDelta) > 0) {
+      uitlegDelen.push(`Omzet ${omzetDelta >= 0 ? "steeg" : "daalde"} ${euroAbs(omzetDelta)}`);
+    }
+    if (Math.abs(kostenDelta) > 0) {
+      uitlegDelen.push(`kosten ${kostenDelta >= 0 ? "stegen" : "daalden"} ${euroAbs(kostenDelta)}`);
+    }
+    const uitleg = uitlegDelen.length > 0 ? `${uitlegDelen.join(" en ")}.` : undefined;
+
     return {
       titel: `Waarom is je resultaat ${richting}?`,
       periode: periodeLabel,
       hoofdMetric: {
-        label: "Netto-effect",
+        label: "Verschil t.o.v. vorig jaar",
         waarde: netDelta,
-        uitleg: `Opgebouwd uit ${formatSigned(omzetDelta)} omzet en ${formatSigned(-kostenDelta)} kosten-effect (kosten zijn omgekeerd: een stijging drukt het resultaat).`,
+        uitleg,
         isPositief: netDelta >= 0,
       },
       // Waterfall: vorig resultaat + omzetDelta + (-kostenDelta) = huidig resultaat.
       // Kosten-effect wordt gespiegeld: kosten omhoog = negatief voor resultaat.
       waterfall: {
         titel: "Hoe is dit opgebouwd?",
-        start: { label: `Resultaat ${jaar - 1}`, waarde: vorigSamePeriod.marge },
+        start: { label: "Resultaat vorig jaar", waarde: vorigSamePeriod.marge },
         effecten: [
           { label: "Omzet-effect", waarde: omzetDelta },
           { label: "Kosten-effect", waarde: -kostenDelta },
         ],
-        eind: { label: `Resultaat ${jaar}`, waarde: huidig.marge },
+        eind: { label: "Resultaat dit jaar", waarde: huidig.marge },
       },
       sections,
       conclusie,
     };
-  }, [heeftVorigeData, huidig.omzet, huidig.kosten, huidig.marge, vorigSamePeriod, kostenAfwijkingen, omzetAfwijkingen, periodeLabel, jaar]);
+  }, [heeftVorigeData, huidig.omzet, huidig.kosten, huidig.marge, vorigSamePeriod, kostenAfwijkingen, omzetAfwijkingen, periodeLabel]);
 
   // ─── Omzet ──────────────────────────────────────────────────────────────────
   const omzetWaarom = useMemo<WaaromData | null>(() => {
