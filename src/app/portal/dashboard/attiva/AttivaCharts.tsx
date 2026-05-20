@@ -118,6 +118,9 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [maand, setMaand] = useState<string | null>(null);
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
+  // Verhoogd bij elke '+ Taak'-klik in WatVraagtAandacht; Takenlijst luistert
+  // hierop en refetcht, zodat de net aangemaakte taak meteen verschijnt.
+  const [takenRefreshKey, setTakenRefreshKey] = useState(0);
   const [autoFallback, setAutoFallback] = useState<number | null>(null);
   const [detailMaand, setDetailMaand] = useState<number | null>(null);
   const [detailCategorie, setDetailCategorie] = useState<{ naam: string; type: "omzet" | "kosten" } | null>(null);
@@ -440,7 +443,11 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
     <div className="space-y-6">
       {/* "Wat vraagt aandacht?" — gebruikt dezelfde pl/crediteuren als de
           KPI-tegels eronder. Garandeert één waarheid. */}
-      <WatVraagtAandacht pl={data.pl ?? []} crediteuren={data.crediteuren ?? []} />
+      <WatVraagtAandacht
+        pl={data.pl ?? []}
+        crediteuren={data.crediteuren ?? []}
+        onTaskCreated={() => setTakenRefreshKey((v) => v + 1)}
+      />
 
       {/* Gecombineerde filterbalk */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -541,7 +548,7 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       */}
 
       {/* 3. Takenlijst — vervangt de AI-Actiepunten met echte afvinkbare taken */}
-      {maandData.length > 0 && <Takenlijst />}
+      {maandData.length > 0 && <Takenlijst refreshKey={takenRefreshKey} />}
 
       {/* KPI Cards — alleen tonen bij maand-filter (anders dubbel met Management Samenvatting) */}
       {maand && (

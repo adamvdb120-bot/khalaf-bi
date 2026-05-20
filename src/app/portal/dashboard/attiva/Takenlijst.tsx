@@ -26,7 +26,16 @@ function euro(v: number) {
   return `€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
 }
 
-export default function Takenlijst() {
+interface TakenlijstProps {
+  /**
+   * Wanneer deze waarde verandert haalt de Takenlijst zijn data opnieuw op.
+   * Wordt door AttivaCharts opgehoogd na een '+ Taak'-klik in WatVraagtAandacht,
+   * zodat de net aangemaakte taak direct in de lijst verschijnt.
+   */
+  refreshKey?: number;
+}
+
+export default function Takenlijst({ refreshKey = 0 }: TakenlijstProps) {
   const [taken, setTaken] = useState<Taak[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +67,7 @@ export default function Takenlijst() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [refreshKey]);
 
   async function addTaak() {
     const titel = newTitel.trim();

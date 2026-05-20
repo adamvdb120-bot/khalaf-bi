@@ -70,9 +70,15 @@ interface Props {
   pl?: PlRow[];
   /** Aged crediteurenrijen — zelfde rationale: één bron voor de UI. */
   crediteuren?: CrediteurRow[];
+  /**
+   * Aangeroepen na een succesvolle '+ Taak'-klik (zowel bij nieuwe taak
+   * als bij duplicate). Parent kan hierop een refresh-trigger voor de
+   * Takenlijst doen zodat de net aangemaakte taak meteen zichtbaar is.
+   */
+  onTaskCreated?: () => void;
 }
 
-export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
+export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Props) {
   const [apiNotifications, setApiNotifications] = useState<Notification[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -106,6 +112,9 @@ export default function WatVraagtAandacht({ pl, crediteuren }: Props) {
         next.set(n.id, json.duplicate ? "duplicate" : "new");
         return next;
       });
+      // Geef parent de gelegenheid om de Takenlijst te refetchen, zodat
+      // de net aangemaakte taak meteen zichtbaar is (geen handmatige refresh).
+      onTaskCreated?.();
     } catch (err) {
       alert(`Taak aanmaken mislukt: ${err instanceof Error ? err.message : "onbekend"}`);
     } finally {
