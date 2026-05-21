@@ -10,6 +10,7 @@ import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
 import Takenlijst from "./Takenlijst";
+import Administratiestatus from "./Administratiestatus";
 import ActivityFeed from "@/components/portal/ActivityFeed";
 import DoelenVoortgang from "@/components/portal/DoelenVoortgang";
 import ManagementSamenvatting from "@/components/portal/ManagementSamenvatting";
@@ -552,6 +553,10 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
 
       {/* 3. Takenlijst — vervangt de AI-Actiepunten met echte afvinkbare taken */}
       {maandData.length > 0 && <Takenlijst refreshKey={takenRefreshKey} />}
+
+      {/* 4. Administratiestatus — per maand status + checklist voor inhalen
+          en bijhouden van de boekhoudkundige verwerking. */}
+      {maandData.length > 0 && <Administratiestatus jaar={jaar} />}
 
       {/* KPI Cards — alleen tonen bij maand-filter (anders dubbel met Management Samenvatting) */}
       {maand && (
