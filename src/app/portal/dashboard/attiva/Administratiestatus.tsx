@@ -189,21 +189,25 @@ export default function Administratiestatus({ jaar }: Props) {
               const stijl = STATUS_STYLES[m.status];
               const klaar = aantalKlaar(m);
               const isOpen = openMaand === m.maand;
+              // Counter krijgt zelfde tint als de maandnaam bij niet-open
+              // statussen — versterkt het verschil tussen "leeg" en "in
+              // uitvoering / klaar / afgesloten" zonder het laten te schreeuwen.
+              const counterColor = m.status === "open" ? "text-gray-500" : stijl.text;
               return (
                 <button
                   key={m.maand}
                   onClick={() => setOpenMaand(isOpen ? null : m.maand)}
                   className={`rounded-lg border ${stijl.border} ${stijl.bg} p-2 text-left transition-all hover:shadow-sm ${
-                    isOpen ? "ring-2 ring-navy-700/30" : ""
+                    isOpen ? "ring-2 ring-navy-700 shadow-sm" : ""
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className={`text-xs font-bold ${stijl.text}`}>
                       {MAAND_NAMEN[m.maand - 1]}
                     </span>
-                    <span className={`w-1.5 h-1.5 rounded-full ${stijl.dot}`} />
+                    <span className={`w-2 h-2 rounded-full ${stijl.dot}`} />
                   </div>
-                  <p className="text-[10px] text-gray-500">{klaar}/8 klaar</p>
+                  <p className={`text-[10px] font-medium ${counterColor}`}>{klaar}/8 klaar</p>
                 </button>
               );
             })}
@@ -221,14 +225,23 @@ export default function Administratiestatus({ jaar }: Props) {
               <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/40 p-4">
                 {/* Detail-header */}
                 <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <h4 className="text-sm font-bold text-navy-700">
                       {MAAND_NAMEN[m.maand - 1]} {m.jaar}
                     </h4>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${stijl.text} ${stijl.bg}`}>
                       {STATUS_LABELS[m.status]}
                     </span>
-                    <span className="text-[10px] text-gray-500">· {klaar}/8 klaar</span>
+                    {/* Voortgang: progressbar + counter geeft tastbaar gevoel */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-28 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-navy-700 rounded-full transition-all"
+                          style={{ width: `${(klaar / 8) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-semibold text-gray-500">{klaar}/8</span>
+                    </div>
                   </div>
                   <button
                     onClick={() => setOpenMaand(null)}
