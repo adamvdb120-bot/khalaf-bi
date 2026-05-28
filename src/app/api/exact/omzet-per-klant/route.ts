@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { checkClientAccess } from "@/lib/portal/access";
 import { getValidExactToken, exactGet } from "@/lib/exact/client";
 
 // Cache TTL — 1 uur, want bankboekingen veranderen niet vaak
@@ -25,12 +25,9 @@ interface KlantOmzet {
 }
 
 export async function GET(req: Request) {
-  // Auth check
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
-  }
+  // Alleen admin of de Attiva-klant zelf — niet zomaar elke ingelogde user.
+  const access = await checkClientAccess("attiva");
+  if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
 
   const url = new URL(req.url);
   const jaar = parseInt(url.searchParams.get("jaar") ?? "0", 10);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { checkClientAccess } from "@/lib/portal/access";
 
 // Cache TTL — data wordt 's nachts ververst via cron, anders na 60 min als de cron miste
 const CACHE_TTL_MS = 60 * 60 * 1000;
@@ -250,9 +250,9 @@ export async function GET(req: Request) {
   const isCron = cronSecret === process.env.CRON_SECRET && cronSecret !== undefined;
 
   if (!isCron) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    // Alleen admin of de Attiva-klant zelf — niet zomaar elke ingelogde user.
+    const access = await checkClientAccess("attiva");
+    if (!access) return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
   }
 
   const admin = createAdminClient();

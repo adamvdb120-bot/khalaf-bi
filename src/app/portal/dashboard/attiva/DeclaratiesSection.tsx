@@ -467,9 +467,9 @@ export default function DeclaratiesSection() {
       <div id="omzet-per-client" className="card scroll-mt-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-bold text-navy-700">Omzet per cliënt — {periodeLabelHuidig}</h3>
+            <h3 className="font-bold text-navy-700">Uitbetaald per cliënt — {periodeLabelHuidig}</h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              Declaraties per budgethouder, vergeleken met {periodeLabelVorig}
+              SVB-uitbetalingen per budgethouder, vergeleken met {periodeLabelVorig}
               {maand && <span className="text-gray-300"> · gefilterd op {maand} (zie maandfilter bovenaan)</span>}
             </p>
           </div>
@@ -482,7 +482,7 @@ export default function DeclaratiesSection() {
         {top10Omzet.length > 0 && (
           <div className="mb-5">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-              Top {top10Omzet.length} op omzet {periodeLabelHuidig}
+              Top {top10Omzet.length} op uitbetaald bedrag {periodeLabelHuidig}
             </p>
             <ResponsiveContainer width="100%" height={Math.max(200, top10Omzet.length * 34)}>
               <BarChart data={top10Omzet} layout="vertical" margin={{ left: 10, right: 60 }}>
@@ -546,7 +546,7 @@ export default function DeclaratiesSection() {
         </div>
 
         <p className="text-[10px] text-gray-400 mt-3 italic">
-          Bron: declaratiedata. Bedragen kunnen licht afwijken van de Exact-omzet door SVB-timing.
+          Bron: SVB-declaratieoverzicht. Bedragen kunnen licht afwijken van Exact-omzet door timing.
         </p>
       </div>
 
