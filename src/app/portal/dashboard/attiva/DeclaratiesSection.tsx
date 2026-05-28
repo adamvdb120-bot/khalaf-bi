@@ -65,6 +65,15 @@ interface BudgetRow {
   budget: number;
 }
 
+// Per cliënt met maand-uitsplitsing (uit /api/attiva/declaraties-per-persoon)
+interface PersoonMaand {
+  naam: string;
+  totaal: number;
+  perMaand: number[];
+}
+
+const MAAND_ARR = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
+
 export default function DeclaratiesSection() {
   const [data, setData] = useState<DeclaratieData | null>(null);
   const [vorigData, setVorigData] = useState<DeclaratieData | null>(null);
@@ -79,24 +88,33 @@ export default function DeclaratiesSection() {
   const [editingNaam, setEditingNaam] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [savingNaam, setSavingNaam] = useState<string | null>(null);
+  // Per cliënt per maand — voor de Omzet-per-cliënt kaart met maandfilter.
+  const [persoonMaand, setPersoonMaand] = useState<PersoonMaand[]>([]);
+  const [persoonMaandVorig, setPersoonMaandVorig] = useState<PersoonMaand[]>([]);
 
   async function load(j: number) {
     setLoading(true);
     setError(null);
     try {
-      const [res, resVorig, resBudg] = await Promise.all([
+      const [res, resVorig, resBudg, resPP, resPPVorig] = await Promise.all([
         fetch(`/api/attiva/declaraties?jaar=${j}`),
         fetch(`/api/attiva/declaraties?jaar=${j - 1}`),
         fetch(`/api/attiva/budgetten?jaar=${j}`),
+        fetch(`/api/attiva/declaraties-per-persoon?jaar=${j}`),
+        fetch(`/api/attiva/declaraties-per-persoon?jaar=${j - 1}`),
       ]);
       if (!res.ok) throw new Error(await res.text());
-      const [d, dv, budg] = await Promise.all([
+      const [d, dv, budg, pp, ppVorig] = await Promise.all([
         res.json(),
         resVorig.ok ? resVorig.json() : null,
         resBudg.ok ? resBudg.json() : [],
+        resPP.ok ? resPP.json() : { personen: [] },
+        resPPVorig.ok ? resPPVorig.json() : { personen: [] },
       ]);
       setData(d);
       setVorigData(dv);
+      setPersoonMaand((pp.personen as PersoonMaand[]) ?? []);
+      setPersoonMaandVorig((ppVorig.personen as PersoonMaand[]) ?? []);
       const budMap: Record<string, number> = {};
       for (const row of (budg as BudgetRow[]) ?? []) {
         if (row.budgethouder && typeof row.budget === "number") {
@@ -223,37 +241,55 @@ export default function DeclaratiesSection() {
   const vorigZorg = vorigData?.perSoort.find(s => s.soort === "Geleverde zorg");
   const vorigLoon = vorigData?.perSoort.find(s => s.soort === "Maandloon");
 
-  // ─── Omzet per cliënt: huidig jaar vs vorig jaar, gemerged op naam ──────────
+  // ─── Omzet per cliënt: huidig vs vorig jaar, reageert op de maandfilter ─────
+  // Bij "heel jaar" (maand === null) tonen we de jaartotalen; bij een gekozen
+  // maand de waarde van die maand uit perMaand[]. Budgetstatus blijft altijd op
+  // jaarbasis (een budget is per definitie een jaarbedrag).
+  const maandIdx = maand ? MAAND_ARR.indexOf(maand) : -1;
+  const omzetVan = (p: PersoonMaand | undefined): number => {
+    if (!p) return 0;
+    if (maandIdx >= 0) return p.perMaand[maandIdx] ?? 0;
+    return p.totaal;
+  };
+
   const clientOmzet = (() => {
-    const vorigMap = new Map<string, number>();
-    for (const p of vorigData?.perPersoon ?? []) vorigMap.set(p.naam, p.bedrag);
-    const huidigMap = new Map<string, number>();
-    for (const p of data.perPersoon) huidigMap.set(p.naam, p.bedrag);
+    const huidigMap = new Map<string, PersoonMaand>();
+    for (const p of persoonMaand) huidigMap.set(p.naam, p);
+    const vorigMap = new Map<string, PersoonMaand>();
+    for (const p of persoonMaandVorig) vorigMap.set(p.naam, p);
 
     const allNamen = new Set<string>([...huidigMap.keys(), ...vorigMap.keys()]);
-    const totaalHuidig = data.totaal || 1;
-    return Array.from(allNamen).map(naam => {
-      const nu = huidigMap.get(naam) ?? 0;
-      const vorig = vorigMap.get(naam) ?? 0;
+    const rows = Array.from(allNamen).map(naam => {
+      const hp = huidigMap.get(naam);
+      const vp = vorigMap.get(naam);
+      const nu = omzetVan(hp);
+      const vorig = omzetVan(vp);
       return {
         naam,
         nu,
         vorig,
         delta: nu - vorig,
-        aandeel: (nu / totaalHuidig) * 100,
+        jaarTotaal: hp?.totaal ?? 0,   // voor budgetstatus (altijd jaarbasis)
         budget: budgetten[naam] ?? 0,
       };
-    })
+    });
+    const totaalPeriode = rows.reduce((s, r) => s + r.nu, 0) || 1;
+    return rows
+      .map(r => ({ ...r, aandeel: (r.nu / totaalPeriode) * 100 }))
       // Sorteer op grootste van (nu, vorig) zodat zowel huidige toppers als
       // weggevallen cliënten (hoog vorig jaar, nu laag) bovenaan blijven staan.
       .sort((a, b) => Math.max(b.nu, b.vorig) - Math.max(a.nu, a.vorig));
   })();
 
-  // Top 10 op huidige omzet voor de grafiek
+  // Top 10 op omzet (van de geselecteerde periode) voor de grafiek
   const top10Omzet = [...clientOmzet]
     .filter(c => c.nu > 0)
     .sort((a, b) => b.nu - a.nu)
     .slice(0, 10);
+
+  // Label voor de geselecteerde periode (bv. "Apr 2025" of "2025")
+  const periodeLabelHuidig = maand ? `${maand} ${jaar}` : `${jaar}`;
+  const periodeLabelVorig = maand ? `${maand} ${jaar - 1}` : `${jaar - 1}`;
 
 
   const chatContext = [
@@ -431,19 +467,22 @@ export default function DeclaratiesSection() {
       <div id="omzet-per-client" className="card scroll-mt-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-bold text-navy-700">Omzet per cliënt — {jaar}</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Declaraties per budgethouder, vergeleken met {jaar - 1}</p>
+            <h3 className="font-bold text-navy-700">Omzet per cliënt — {periodeLabelHuidig}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Declaraties per budgethouder, vergeleken met {periodeLabelVorig}
+              {maand && <span className="text-gray-300"> · gefilterd op {maand} (zie maandfilter bovenaan)</span>}
+            </p>
           </div>
           <span className="text-sm text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl font-medium">
             {clientOmzet.length} cliënten
           </span>
         </div>
 
-        {/* Top 10 grafiek op huidige omzet */}
+        {/* Top 10 grafiek op omzet van de geselecteerde periode */}
         {top10Omzet.length > 0 && (
           <div className="mb-5">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-              Top {top10Omzet.length} op omzet {jaar}
+              Top {top10Omzet.length} op omzet {periodeLabelHuidig}
             </p>
             <ResponsiveContainer width="100%" height={Math.max(200, top10Omzet.length * 34)}>
               <BarChart data={top10Omzet} layout="vertical" margin={{ left: 10, right: 60 }}>
@@ -474,8 +513,8 @@ export default function DeclaratiesSection() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 py-2 text-left font-semibold text-gray-500">Cliënt</th>
-                <th className="px-3 py-2 text-right font-semibold text-gray-500">{jaar}</th>
-                <th className="px-3 py-2 text-right font-semibold text-gray-500">{jaar - 1}</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-500">{periodeLabelHuidig}</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-500">{periodeLabelVorig}</th>
                 <th className="px-3 py-2 text-right font-semibold text-gray-500">Verschil</th>
                 <th className="px-3 py-2 text-right font-semibold text-gray-500">Aandeel</th>
                 <th className="px-3 py-2 text-left font-semibold text-gray-500">Budgetstatus</th>
@@ -483,7 +522,9 @@ export default function DeclaratiesSection() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {clientOmzet.map((c) => {
-                const status = clientBudgetStatus(c.nu, c.budget);
+                // Budgetstatus altijd op jaarbasis — een budget is een jaarbedrag,
+                // ongeacht of de tabel een maand of het hele jaar toont.
+                const status = clientBudgetStatus(c.jaarTotaal, c.budget);
                 const deltaColor = c.delta > 0 ? "text-emerald-700" : c.delta < 0 ? "text-red-600" : "text-gray-400";
                 return (
                   <tr key={c.naam} className="hover:bg-gray-50">
