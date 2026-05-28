@@ -551,13 +551,6 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
       */}
 
-      {/* 3. Takenlijst — vervangt de AI-Actiepunten met echte afvinkbare taken */}
-      {maandData.length > 0 && <Takenlijst refreshKey={takenRefreshKey} />}
-
-      {/* 4. Administratiestatus — per maand status + checklist voor inhalen
-          en bijhouden van de boekhoudkundige verwerking. */}
-      {maandData.length > 0 && <Administratiestatus jaar={jaar} />}
-
       {/* KPI Cards — alleen tonen bij maand-filter (anders dubbel met Management Samenvatting) */}
       {maand && (
         <div className="grid grid-cols-3 gap-5">
@@ -956,6 +949,13 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       )}
 
       </div>
+
+      {/* Werktools onder de financiële analyse — bewust BUITEN de export-div
+          (attiva-financieel-export) zodat ze niet in de PDF-rapportage komen.
+          Takenlijst en administratiestatus zijn interne opvolging, geen
+          rapportinhoud; op het dashboard blijven ze gewoon zichtbaar. */}
+      {maandData.length > 0 && <Takenlijst refreshKey={takenRefreshKey} />}
+      {maandData.length > 0 && <Administratiestatus jaar={jaar} />}
 
       {/* Activity Feed — lager op de pagina, niet de top-aandacht trekken */}
       {maandData.length > 0 && (
