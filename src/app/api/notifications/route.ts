@@ -349,7 +349,7 @@ export async function GET() {
           severity: "attention",
           titel: `${weggevallen.length} ${weggevallen.length === 1 ? "cliënt lijkt" : "cliënten lijken"} weggevallen`,
           beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (was ${euro(c.vorig)})`).join(", "),
-          href: "/portal/dashboard/attiva?tab=declaraties",
+          href: "/portal/dashboard/attiva?tab=declaraties#omzet-per-client",
           klant: "Attiva Zorg",
         });
       }

@@ -43,6 +43,23 @@ function initials(naam: string) {
   return naam.split(/[\s.]+/).filter(Boolean).slice(0, 2).map(n => n[0]).join("").toUpperCase();
 }
 
+// Compacte budgetstatus voor de omzet-per-cliënt tabel. Zelfde drempels als
+// het cliëntenoverzicht eronder.
+function clientBudgetStatus(verbruikt: number, budget: number): { label: string; color: string; bg: string } {
+  if (budget <= 0) return { label: "Geen budget", color: "text-gray-500", bg: "bg-gray-100" };
+  const pct = (verbruikt / budget) * 100;
+  if (pct >= 100) return { label: "Over budget", color: "text-red-700", bg: "bg-red-50" };
+  if (pct >= 90) return { label: "Bijna op", color: "text-orange-700", bg: "bg-orange-50" };
+  if (pct >= 75) return { label: "Let op", color: "text-amber-700", bg: "bg-amber-50" };
+  return { label: "Ruim binnen", color: "text-emerald-700", bg: "bg-emerald-50" };
+}
+
+// Signed euro-weergave: +€ 1.234 / −€ 1.234
+function euroSigned(v: number) {
+  const sign = v > 0 ? "+" : v < 0 ? "−" : "";
+  return `${sign}€ ${Math.round(Math.abs(v)).toLocaleString("nl-NL")}`;
+}
+
 interface BudgetRow {
   budgethouder: string;
   budget: number;
@@ -205,6 +222,38 @@ export default function DeclaratiesSection() {
 
   const vorigZorg = vorigData?.perSoort.find(s => s.soort === "Geleverde zorg");
   const vorigLoon = vorigData?.perSoort.find(s => s.soort === "Maandloon");
+
+  // ─── Omzet per cliënt: huidig jaar vs vorig jaar, gemerged op naam ──────────
+  const clientOmzet = (() => {
+    const vorigMap = new Map<string, number>();
+    for (const p of vorigData?.perPersoon ?? []) vorigMap.set(p.naam, p.bedrag);
+    const huidigMap = new Map<string, number>();
+    for (const p of data.perPersoon) huidigMap.set(p.naam, p.bedrag);
+
+    const allNamen = new Set<string>([...huidigMap.keys(), ...vorigMap.keys()]);
+    const totaalHuidig = data.totaal || 1;
+    return Array.from(allNamen).map(naam => {
+      const nu = huidigMap.get(naam) ?? 0;
+      const vorig = vorigMap.get(naam) ?? 0;
+      return {
+        naam,
+        nu,
+        vorig,
+        delta: nu - vorig,
+        aandeel: (nu / totaalHuidig) * 100,
+        budget: budgetten[naam] ?? 0,
+      };
+    })
+      // Sorteer op grootste van (nu, vorig) zodat zowel huidige toppers als
+      // weggevallen cliënten (hoog vorig jaar, nu laag) bovenaan blijven staan.
+      .sort((a, b) => Math.max(b.nu, b.vorig) - Math.max(a.nu, a.vorig));
+  })();
+
+  // Top 10 op huidige omzet voor de grafiek
+  const top10Omzet = [...clientOmzet]
+    .filter(c => c.nu > 0)
+    .sort((a, b) => b.nu - a.nu)
+    .slice(0, 10);
 
 
   const chatContext = [
@@ -375,6 +424,89 @@ export default function DeclaratiesSection() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Omzet per cliënt — declaraties huidig jaar vs vorig jaar */}
+      {/* id voor deep-link uit de 'cliënt weggevallen'-melding */}
+      <div id="omzet-per-client" className="card scroll-mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-navy-700">Omzet per cliënt — {jaar}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Declaraties per budgethouder, vergeleken met {jaar - 1}</p>
+          </div>
+          <span className="text-sm text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl font-medium">
+            {clientOmzet.length} cliënten
+          </span>
+        </div>
+
+        {/* Top 10 grafiek op huidige omzet */}
+        {top10Omzet.length > 0 && (
+          <div className="mb-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+              Top {top10Omzet.length} op omzet {jaar}
+            </p>
+            <ResponsiveContainer width="100%" height={Math.max(200, top10Omzet.length * 34)}>
+              <BarChart data={top10Omzet} layout="vertical" margin={{ left: 10, right: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }}
+                  tickFormatter={v => `€${(v / 1000).toFixed(0)}K`} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="naam" tick={{ fontSize: 11, fill: "#1B3A5C" }}
+                  width={130} axisLine={false} tickLine={false}
+                  tickFormatter={(s: string) => s.length > 22 ? s.slice(0, 22) + "…" : s} />
+                <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                <Bar dataKey="nu" name="Omzet" radius={[0, 5, 5, 0]}>
+                  {top10Omzet.map((c, i) => (
+                    <Cell key={i} fill={c.delta >= 0 ? "#10b981" : "#d97706"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex items-center gap-4 mt-1 text-[10px] text-gray-400">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> gestegen / gelijk t.o.v. {jaar - 1}</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-600 inline-block" /> gedaald t.o.v. {jaar - 1}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Volledige tabel met YoY-vergelijking */}
+        <div className="overflow-x-auto">
+          <table className="text-xs w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold text-gray-500">Cliënt</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-500">{jaar}</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-500">{jaar - 1}</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-500">Verschil</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-500">Aandeel</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-500">Budgetstatus</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {clientOmzet.map((c) => {
+                const status = clientBudgetStatus(c.nu, c.budget);
+                const deltaColor = c.delta > 0 ? "text-emerald-700" : c.delta < 0 ? "text-red-600" : "text-gray-400";
+                return (
+                  <tr key={c.naam} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-navy-700">{c.naam}</td>
+                    <td className="px-3 py-2 text-right text-navy-700 font-semibold">{euro(c.nu)}</td>
+                    <td className="px-3 py-2 text-right text-gray-500">{euro(c.vorig)}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${deltaColor}`}>{euroSigned(c.delta)}</td>
+                    <td className="px-3 py-2 text-right text-gray-500">{c.aandeel.toFixed(1)}%</td>
+                    <td className="px-3 py-2">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.color} ${status.bg}`}>
+                        {status.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-[10px] text-gray-400 mt-3 italic">
+          Bron: declaratiedata. Bedragen kunnen licht afwijken van de Exact-omzet door SVB-timing.
+        </p>
       </div>
 
       {/* Clientenoverzicht — uitbetaald + jaarbudget per cliënt */}
