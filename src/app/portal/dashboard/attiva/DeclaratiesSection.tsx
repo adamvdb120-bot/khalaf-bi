@@ -555,7 +555,7 @@ export default function DeclaratiesSection() {
       <div id="clientenoverzicht" className="card scroll-mt-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-bold text-navy-700">Clientenoverzicht</h3>
+            <h3 className="font-bold text-navy-700">Cliëntenoverzicht</h3>
             <p className="text-xs text-gray-400 mt-0.5">Uitbetaald vs jaarbudget per budgethouder — {jaar}</p>
           </div>
           <span className="text-sm text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl font-medium">
