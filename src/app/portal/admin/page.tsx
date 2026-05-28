@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { buildAttivaSignals } from "@/lib/portal/signals";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -39,16 +40,6 @@ const DEMO_CLIENTS = [
   },
 ];
 
-interface AandachtsPunt {
-  klant: string;
-  klantId: string;
-  ernst: "alarm" | "let_op" | "info";
-  titel: string;
-  detail: string;
-  bedrag?: string;
-  href: string;
-}
-
 interface ActivityItem {
   type: "upload" | "klant" | "cache" | "doel";
   titel: string;
@@ -69,12 +60,6 @@ function timeAgo(date: string | Date): string {
   return new Date(date).toLocaleDateString("nl-NL");
 }
 
-function euro(v: number) {
-  return `€ ${Math.round(v).toLocaleString("nl-NL")}`;
-}
-
-interface CrediteurRow { Name: string; Age0to30: number; Age31to60: number; Age61to90: number; Age90Plus: number }
-
 export default async function AdminPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -87,84 +72,29 @@ export default async function AdminPage() {
   const admin = createAdminClient();
 
   // ─── Data ophalen ──────────────────────────────────────────────────────────
-  const [profilesRes, uploadsRes, attivaCacheRes, doelenRes] = await Promise.all([
+  // Aandachtspunten komen uit dezelfde bron als de sidebar-meldingen
+  // (buildAttivaSignals), zodat beide tellers altijd gelijk zijn.
+  const [profilesRes, uploadsRes, doelenRes, signalsResult] = await Promise.all([
     admin.from("profiles").select("id, full_name, company, role, created_at").eq("role", "client").order("created_at", { ascending: false }),
     admin.from("uploads").select("id, user_id, name, created_at").order("created_at", { ascending: false }).limit(20),
-    admin.from("exact_data_cache").select("data, updated_at").eq("client_name", "attiva").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("attiva_doelen").select("jaar, updated_at").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    buildAttivaSignals(admin),
   ]);
 
   const profiles = profilesRes.data ?? [];
   const uploads = uploadsRes.data ?? [];
-  const attivaCache = attivaCacheRes.data;
   const laatsteDoelen = doelenRes.data;
+  const { notifications: signalen, attivaLastRefresh } = signalsResult;
 
-  // ─── Aandachtspunten berekenen uit Attiva-data ─────────────────────────────
-  const aandachtspunten: AandachtsPunt[] = [];
-
-  if (attivaCache?.data) {
-    const cacheData = attivaCache.data as {
-      huidig?: { crediteuren?: CrediteurRow[]; pl?: { Amount: number; IsRevenue: boolean; Period: number }[] };
-      crediteuren?: CrediteurRow[];
-      pl?: { Amount: number; IsRevenue: boolean; Period: number }[];
-    };
-    const huidig = cacheData.huidig ?? cacheData;
-    const crediteuren: CrediteurRow[] = huidig?.crediteuren ?? [];
-
-    // Urgent crediteuren > 90 dagen
-    const urgentCrediteuren = crediteuren.filter(c => (c.Age90Plus ?? 0) > 0);
-    const totaalUrgent = urgentCrediteuren.reduce((s, c) => s + (c.Age90Plus ?? 0), 0);
-
-    if (urgentCrediteuren.length > 0) {
-      aandachtspunten.push({
-        klant: "Attiva Zorg",
-        klantId: "attiva",
-        ernst: totaalUrgent > 5000 ? "alarm" : "let_op",
-        titel: `${urgentCrediteuren.length} urgent crediteur${urgentCrediteuren.length === 1 ? "" : "en"}`,
-        detail: `Top: ${urgentCrediteuren.slice(0, 2).map(c => c.Name).join(", ")}`,
-        bedrag: euro(totaalUrgent),
-        href: "/portal/dashboard/attiva",
-      });
-    }
-
-    // Negatieve marge check
-    const pl = huidig?.pl ?? [];
-    const totaalOmzet = pl.filter(r => r.IsRevenue).reduce((s, r) => s + r.Amount, 0);
-    const totaalKosten = pl.filter(r => !r.IsRevenue).reduce((s, r) => s + r.Amount, 0);
-    const marge = totaalOmzet - totaalKosten;
-    const margePct = totaalOmzet > 0 ? (marge / totaalOmzet) * 100 : 0;
-
-    if (marge < 0) {
-      aandachtspunten.push({
-        klant: "Attiva Zorg",
-        klantId: "attiva",
-        ernst: "alarm",
-        titel: "Negatief jaarresultaat",
-        detail: `Kosten overstegen de omzet met ${euro(Math.abs(marge))}`,
-        bedrag: `${margePct.toFixed(1)}%`,
-        href: "/portal/dashboard/attiva",
-      });
-    } else if (margePct < 5 && margePct > 0) {
-      aandachtspunten.push({
-        klant: "Attiva Zorg",
-        klantId: "attiva",
-        ernst: "let_op",
-        titel: "Zeer dunne marge",
-        detail: `Brutomarge is slechts ${margePct.toFixed(1)}% — onder kritische drempel`,
-        bedrag: euro(marge),
-        href: "/portal/dashboard/attiva",
-      });
-    }
-  } else {
-    aandachtspunten.push({
-      klant: "Attiva Zorg",
-      klantId: "attiva",
-      ernst: "info",
-      titel: "Geen recente data",
-      detail: "Open het dashboard om Exact-data te verversen",
-      href: "/portal/dashboard/attiva",
-    });
-  }
+  // Open meldingen + laatste data-refresh per klant. Alleen Attiva heeft
+  // (nog) een eigen signaalbron en Exact-cache; andere klanten tonen 0 / —.
+  const meldingenPerKlant: Record<string, { open: number; alarm: number; laatsteRefresh: string | null }> = {
+    attiva: {
+      open: signalen.length,
+      alarm: signalen.filter(s => s.severity === "alarm").length,
+      laatsteRefresh: attivaLastRefresh,
+    },
+  };
 
   // ─── Activity feed ─────────────────────────────────────────────────────────
   const activity: ActivityItem[] = [];
@@ -193,12 +123,12 @@ export default async function AdminPage() {
   }
 
   // Cache refresh
-  if (attivaCache?.updated_at) {
+  if (attivaLastRefresh) {
     activity.push({
       type: "cache",
       titel: "Attiva Exact-data ververst",
       detail: "Automatische sync uit Exact Online",
-      tijd: timeAgo(attivaCache.updated_at),
+      tijd: timeAgo(attivaLastRefresh),
       icon: RefreshCw,
     });
   }
@@ -232,9 +162,13 @@ export default async function AdminPage() {
   const uploadsDezeMaand = uploads.filter(u =>
     new Date(u.created_at) > new Date(Date.now() - 30 * 86400000)
   ).length;
-  const urgentTotaal = aandachtspunten.filter(a => a.ernst === "alarm").length;
+  const urgentTotaal = signalen.filter(s => s.severity === "alarm").length;
 
-  const naam = profile?.full_name?.split(" ")[0] ?? "Adam";
+  // Voornaam uit full_name. Als die ontbreekt of nog het e-mailadres bevat
+  // (oude profielen kregen het e-mailadres als full_name), tonen we alleen
+  // de begroeting zonder naam — een e-mailadres in de header oogt onaf.
+  const rawNaam = profile?.full_name?.trim() ?? "";
+  const naam = rawNaam && !rawNaam.includes("@") ? rawNaam.split(" ")[0] : "";
   const vandaag = new Date().toLocaleDateString("nl-NL", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
@@ -249,13 +183,13 @@ export default async function AdminPage() {
         <div className="relative flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold">
-              {groet}, <span className="text-gold-400 capitalize">{naam}</span> 👋
+              {groet}{naam && <>, <span className="text-gold-400 capitalize">{naam}</span></>} 👋
             </h1>
             <p className="text-navy-200 text-sm mt-1 capitalize">{vandaag}</p>
             <p className="text-navy-200 text-sm mt-3 max-w-xl">
-              {aandachtspunten.length === 0
+              {signalen.length === 0
                 ? "Alles loopt soepel — geen urgente acties vandaag."
-                : `${aandachtspunten.length} aandachtspunt${aandachtspunten.length === 1 ? "" : "en"} ${urgentTotaal > 0 ? `waarvan ${urgentTotaal} urgent` : "voor jouw aandacht"}.`}
+                : `${signalen.length} aandachtspunt${signalen.length === 1 ? "" : "en"} ${urgentTotaal > 0 ? `waarvan ${urgentTotaal} urgent` : "voor jouw aandacht"}.`}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -282,9 +216,9 @@ export default async function AdminPage() {
         <StatCard label="Actieve klanten" value={DEMO_CLIENTS.length} icon={Users} accent="navy" />
         <StatCard
           label="Aandachtspunten"
-          value={aandachtspunten.length}
+          value={signalen.length}
           icon={Bell}
-          accent={urgentTotaal > 0 ? "red" : aandachtspunten.length > 0 ? "amber" : "emerald"}
+          accent={urgentTotaal > 0 ? "red" : signalen.length > 0 ? "amber" : "emerald"}
           sub={urgentTotaal > 0 ? `${urgentTotaal} urgent` : undefined}
         />
         <StatCard
@@ -302,7 +236,7 @@ export default async function AdminPage() {
       </div>
 
       {/* ── Aandachtspunten ── */}
-      {aandachtspunten.length > 0 && (
+      {signalen.length > 0 && (
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
@@ -310,37 +244,39 @@ export default async function AdminPage() {
             </div>
             <div>
               <h2 className="font-bold text-navy-700">Aandachtspunten</h2>
-              <p className="text-[11px] text-gray-400">Acties die je deze week niet wil missen</p>
+              <p className="text-[11px] text-gray-400">Zelfde meldingen als in de zijbalk — acties die je deze week niet wil missen</p>
             </div>
           </div>
 
           <div className="space-y-2">
-            {aandachtspunten.map((a, i) => {
+            {signalen.map((s) => {
               const ernstStyle = {
                 alarm: { bg: "bg-red-50", border: "border-red-100", text: "text-red-700", icon: "text-red-500" },
-                let_op: { bg: "bg-amber-50", border: "border-amber-100", text: "text-amber-700", icon: "text-amber-500" },
+                attention: { bg: "bg-amber-50", border: "border-amber-100", text: "text-amber-700", icon: "text-amber-500" },
                 info: { bg: "bg-blue-50", border: "border-blue-100", text: "text-blue-700", icon: "text-blue-500" },
-              }[a.ernst];
+              }[s.severity];
               return (
                 <Link
-                  key={i}
-                  href={a.href}
+                  key={s.id}
+                  href={s.href}
                   className={`flex items-center gap-3 ${ernstStyle.bg} ${ernstStyle.border} border rounded-xl p-3 hover:shadow-sm transition-shadow group`}
                 >
                   <div className={`w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0`}>
-                    {a.ernst === "alarm" ? <AlertTriangle size={15} className={ernstStyle.icon} />
-                      : a.ernst === "let_op" ? <Wallet size={15} className={ernstStyle.icon} />
+                    {s.severity === "alarm" ? <AlertTriangle size={15} className={ernstStyle.icon} />
+                      : s.severity === "attention" ? <Wallet size={15} className={ernstStyle.icon} />
                       : <Sparkles size={15} className={ernstStyle.icon} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-bold text-sm text-navy-700">{a.titel}</span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">· {a.klant}</span>
+                      <span className="font-bold text-sm text-navy-700">{s.titel}</span>
+                      {s.klant && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">· {s.klant}</span>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-600 truncate">{a.detail}</p>
+                    <p className="text-xs text-gray-600 truncate">{s.beschrijving}</p>
                   </div>
-                  {a.bedrag && (
-                    <div className={`text-sm font-bold ${ernstStyle.text} flex-shrink-0`}>{a.bedrag}</div>
+                  {s.bedrag && (
+                    <div className={`text-sm font-bold ${ernstStyle.text} flex-shrink-0`}>{s.bedrag}</div>
                   )}
                   <ArrowRight size={14} className="text-gray-300 group-hover:text-navy-700 group-hover:translate-x-0.5 transition-all" />
                 </Link>
@@ -357,8 +293,10 @@ export default async function AdminPage() {
           <h2 className="font-bold text-navy-700 px-1">Klanten</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             {DEMO_CLIENTS.map((client) => {
-              const klantHeeftAandacht = aandachtspunten.some(a => a.klantId === client.id);
-              const aandachtErnst = aandachtspunten.find(a => a.klantId === client.id)?.ernst;
+              const m = meldingenPerKlant[client.id];
+              const openMeldingen = m?.open ?? 0;
+              const heeftAlarm = (m?.alarm ?? 0) > 0;
+              const laatsteRefresh = m?.laatsteRefresh ?? null;
               return (
                 <Link
                   key={client.id}
@@ -374,13 +312,37 @@ export default async function AdminPage() {
                       <div className="font-bold text-navy-700 leading-tight text-sm truncate">{client.name}</div>
                       <div className="text-[11px] text-gray-400 mt-0.5 truncate">{client.sector}</div>
                     </div>
-                    {klantHeeftAandacht && (
+                    {openMeldingen > 0 && (
                       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        aandachtErnst === "alarm" ? "bg-red-500" :
-                        aandachtErnst === "let_op" ? "bg-amber-500" : "bg-blue-500"
+                        heeftAlarm ? "bg-red-500" : "bg-amber-500"
                       } animate-pulse`} />
                     )}
                   </div>
+
+                  {/* Per-klant kerncijfers */}
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="rounded-lg bg-gray-50 px-2.5 py-2">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        <RefreshCw size={10} /> Laatste update
+                      </div>
+                      <div className="text-xs font-bold text-navy-700 mt-0.5 truncate">
+                        {laatsteRefresh ? timeAgo(laatsteRefresh) : "Nog geen data"}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-2.5 py-2">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        <Bell size={10} /> Open meldingen
+                      </div>
+                      <div className={`text-xs font-bold mt-0.5 truncate ${
+                        openMeldingen === 0 ? "text-emerald-600" : heeftAlarm ? "text-red-600" : "text-amber-600"
+                      }`}>
+                        {openMeldingen === 0
+                          ? "Geen"
+                          : `${openMeldingen} open${heeftAlarm ? ` · ${m?.alarm} urgent` : ""}`}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between text-xs">
                     {client.status === "actief" ? (
                       <span className="inline-flex items-center gap-1.5 text-emerald-700">
