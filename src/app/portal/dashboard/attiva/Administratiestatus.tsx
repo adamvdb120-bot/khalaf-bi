@@ -168,13 +168,14 @@ export default function Administratiestatus({ jaar }: Props) {
           <div>
             <h3 className="text-sm font-bold text-navy-700">Administratiestatus</h3>
             <p className="text-[10px] text-gray-400">
-              Werk achterstanden weg en sluit maanden gecontroleerd af.
-              {!loading && ` · ${afgeslotenCount}/12 afgesloten in ${jaar}`}
+              {collapsed
+                ? (!loading ? `${afgeslotenCount}/12 afgesloten in ${jaar}` : "Laden…")
+                : <>Werk achterstanden weg en sluit maanden gecontroleerd af.{!loading && ` · ${afgeslotenCount}/12 afgesloten in ${jaar}`}</>}
             </p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 hover:text-navy-700 flex-shrink-0 mt-1">
-          {collapsed ? <>Tonen <ChevronDown size={12} /></> : <>Verbergen <ChevronUp size={12} /></>}
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-navy-700 bg-navy-700/5 hover:bg-navy-700/10 px-2.5 py-1.5 rounded-lg flex-shrink-0">
+          {collapsed ? <>Openen <ChevronDown size={12} /></> : <>Inklappen <ChevronUp size={12} /></>}
         </span>
       </button>
 
