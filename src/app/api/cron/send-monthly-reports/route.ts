@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildAttivaOverzicht, type Notification, type Klantgezondheid } from "@/lib/portal/signals";
+import { buildAttivaOverzicht, selectAttivaFinancialCache, type Notification, type Klantgezondheid } from "@/lib/portal/signals";
 
 /**
  * Cron job: stuurt elke 1e van de maand een maandrapport per email naar de klant.
@@ -129,9 +129,20 @@ function buildEmailHtml(
   dashboardUrl: string,
   gezondheid: Klantgezondheid | null,
   signals: Notification[],
+  isHuidigJaar: boolean,
 ) {
   const trendColor = (v: number) => v > 0 ? "#10b981" : v < 0 ? "#ef4444" : "#94a3b8";
   const trendArrow = (v: number) => v > 0 ? "↗" : v < 0 ? "↘" : "→";
+
+  // Als het huidige jaar nog onvoldoende data heeft, valt het rapport terug op
+  // het laatste jaar mét cijfers. Dat wordt expliciet benoemd zodat de klant
+  // nooit twijfelt over welke periode hij ziet.
+  const eyebrow = isHuidigJaar ? `${periodeNaam} ${jaar}` : `Laatste beschikbare periode · ${jaar}`;
+  const titel = isHuidigJaar ? `Maandrapport ${klantNaam}` : `Jaaroverzicht ${klantNaam} ${jaar}`;
+  const subtitle = isHuidigJaar
+    ? "Hieronder vindt u de belangrijkste cijfers van afgelopen maand."
+    : `Er is nog onvoldoende data voor ${new Date().getFullYear()}. Hieronder de laatste volledige cijfers van ${jaar} (t/m ${periodeNaam}).`;
+  const ytdKop = isHuidigJaar ? `Jaar tot nu toe (${jaar})` : `Totaal ${jaar}`;
 
   return `
 <!DOCTYPE html>
@@ -150,9 +161,9 @@ function buildEmailHtml(
 
         <!-- Title -->
         <tr><td style="padding:40px 40px 20px;">
-          <div style="color:#94a3b8;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">${periodeNaam} ${jaar}</div>
-          <h1 style="color:#1B3A5C;font-size:26px;margin:8px 0 0;font-weight:700;">Maandrapport ${klantNaam}</h1>
-          <p style="color:#64748b;font-size:14px;margin:12px 0 0;line-height:1.6;">Hieronder vindt u de belangrijkste cijfers van afgelopen maand.</p>
+          <div style="color:#94a3b8;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">${esc(eyebrow)}</div>
+          <h1 style="color:#1B3A5C;font-size:26px;margin:8px 0 0;font-weight:700;">${esc(titel)}</h1>
+          <p style="color:#64748b;font-size:14px;margin:12px 0 0;line-height:1.6;">${esc(subtitle)}</p>
         </td></tr>
 ${gezondheid ? buildGezondheidHtml(gezondheid) : ""}
 
@@ -185,7 +196,7 @@ ${gezondheid ? buildGezondheidHtml(gezondheid) : ""}
         <tr><td style="padding:0 40px 30px;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;padding:20px;">
             <tr><td style="padding:20px;">
-              <div style="color:#1B3A5C;font-size:14px;font-weight:bold;margin-bottom:12px;">Jaar tot nu toe (${jaar})</div>
+              <div style="color:#1B3A5C;font-size:14px;font-weight:bold;margin-bottom:12px;">${esc(ytdKop)}</div>
               <table width="100%"><tr>
                 <td><span style="color:#94a3b8;font-size:12px;">Totale omzet:</span> <span style="color:#1B3A5C;font-weight:600;font-size:13px;">${euro(kpis.omzetYTD)}</span></td>
                 <td><span style="color:#94a3b8;font-size:12px;">Totale kosten:</span> <span style="color:#1B3A5C;font-weight:600;font-size:13px;">${euro(kpis.kostenYTD)}</span></td>
@@ -252,17 +263,17 @@ export async function GET(req: Request) {
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://khalaf-bi.vercel.app";
 
-  // Periode bepalen: bij cron = vorige maand, bij test = huidige maand
+  // Basis-periode (voor niet-Attiva klanten): bij cron de vorige maand,
+  // bij test/preview de huidige maand. Attiva bepaalt z'n periode hieronder
+  // uit de gekozen cache (zelfde jaar als signalen/gezondheid).
   const now = new Date();
-  let periodeMaand = now.getMonth(); // 0-11
-  let periodeJaar = now.getFullYear();
+  let basisMaand = now.getMonth(); // 0-11
+  let basisJaar = now.getFullYear();
   if (!isManualTest && !isPreview) {
     // Geplande cron op de 1e van de maand → vorige maand rapporteren
-    periodeMaand = periodeMaand - 1;
-    if (periodeMaand < 0) { periodeMaand = 11; periodeJaar -= 1; }
+    basisMaand = basisMaand - 1;
+    if (basisMaand < 0) { basisMaand = 11; basisJaar -= 1; }
   }
-  const periodeNaam = MAANDEN_NL[periodeMaand];
-  const periodeNummer = periodeMaand + 1; // 1-12 voor data filtering
 
   const results: Record<string, unknown> = {};
 
@@ -273,22 +284,46 @@ export async function GET(req: Request) {
     }
 
     try {
-      // Lees de gecachte data uit Supabase
-      const cacheKey = `${periodeJaar}-${periodeJaar - 1}`;
-      const { data: cacheRow } = await admin
-        .from("exact_data_cache")
-        .select("data")
-        .eq("client_name", klant.slug)
-        .eq("cache_key", cacheKey)
-        .single();
+      // Bepaal databron + rapportageperiode. Voor Attiva via de gedeelde
+      // cache-keuze, zodat het YTD-cijfer en het 'jaarresultaat'-signaal in
+      // de mail uit exact dezelfde data komen en nooit kunnen verschillen.
+      let huidigData: ExactData;
+      let vorigData: ExactData;
+      let rapportJaar = basisJaar;
+      let rapportMaand = basisMaand + 1; // 1-12
+      let isHuidigJaar = true;
 
-      if (!cacheRow?.data) {
-        results[klant.slug] = { error: `Geen data in cache voor ${cacheKey}` };
-        continue;
+      if (klant.slug === "attiva") {
+        const financien = await selectAttivaFinancialCache(admin);
+        if (!financien) {
+          results[klant.slug] = { skipped: "Geen financiële data beschikbaar — geen mail verstuurd" };
+          continue;
+        }
+        const cd = financien.data as { huidig?: ExactData; vorig?: ExactData };
+        huidigData = cd.huidig ?? (financien.data as ExactData);
+        vorigData = cd.vorig ?? { pl: [], jaar: financien.jaar - 1 };
+        rapportJaar = financien.jaar;
+        rapportMaand = financien.maxPeriode; // laatste maand mét data
+        isHuidigJaar = financien.jaar === now.getFullYear();
+      } else {
+        const cacheKey = `${basisJaar}-${basisJaar - 1}`;
+        const { data: cacheRow } = await admin
+          .from("exact_data_cache")
+          .select("data")
+          .eq("client_name", klant.slug)
+          .eq("cache_key", cacheKey)
+          .single();
+        if (!cacheRow?.data) {
+          results[klant.slug] = { error: `Geen data in cache voor ${cacheKey}` };
+          continue;
+        }
+        const cd = cacheRow.data as { huidig: ExactData; vorig: ExactData };
+        huidigData = cd.huidig;
+        vorigData = cd.vorig;
       }
 
-      const data = cacheRow.data as { huidig: ExactData; vorig: ExactData };
-      const kpis = buildKpis(data.huidig, data.vorig, periodeNummer);
+      const periodeNaam = MAANDEN_NL[rapportMaand - 1];
+      const kpis = buildKpis(huidigData, vorigData, rapportMaand);
 
       // Aandachtspunten + acties + gezondheidsscore uit de gedeelde signaalbron.
       // Alleen Attiva heeft (nu) een eigen overzicht; andere klanten krijgen geen blok.
@@ -301,9 +336,9 @@ export async function GET(req: Request) {
       }
 
       const html = buildEmailHtml(
-        klant.naam, periodeNaam, periodeJaar, kpis,
+        klant.naam, periodeNaam, rapportJaar, kpis,
         `${baseUrl}/portal/dashboard/${klant.slug}`,
-        gezondheid, signals,
+        gezondheid, signals, isHuidigJaar,
       );
 
       // Preview: stuur de HTML terug zodat je 'm in de browser kunt bekijken.
@@ -313,10 +348,14 @@ export async function GET(req: Request) {
         });
       }
 
+      const subject = isHuidigJaar
+        ? `Maandrapport ${klant.naam} — ${periodeNaam} ${rapportJaar}`
+        : `Jaaroverzicht ${klant.naam} ${rapportJaar}`;
+
       const sendResult = await resend!.emails.send({
         from: "Khalaf BI <onboarding@resend.dev>",
         to: klant.email,
-        subject: `Maandrapport ${klant.naam} — ${periodeNaam} ${periodeJaar}`,
+        subject,
         html,
       });
 
@@ -333,7 +372,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ranAt: new Date().toISOString(),
-    periode: `${periodeNaam} ${periodeJaar}`,
+    periode: `${MAANDEN_NL[basisMaand]} ${basisJaar}`,
     results,
   });
 }

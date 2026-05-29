@@ -34,6 +34,62 @@ export interface AttivaSignals {
   attivaLastRefresh: string | null;
 }
 
+export interface AttivaFinancialCache {
+  /** Rauwe cache.data — vorm { huidig, vorig } of plat. */
+  data: unknown;
+  updatedAt: string;
+  /** Gekozen rapportagejaar (het 'huidig'-jaar van de cache). */
+  jaar: number;
+  /** Hoogste maand (1-12) met P&L-data in de gekozen cache. */
+  maxPeriode: number;
+  cacheKey: string;
+}
+
+/**
+ * Kiest de financiële cache voor Attiva: de cache met de HOOGSTE maand-dekking
+ * (maxPeriode) over [huidigJaar, -1, -2]. Niet zomaar de meest recente — die
+ * kan een AI-cache zijn (insights/narratief) zonder pl, en een partieel huidig
+ * jaar (jan-only) mag niet winnen van een vol vorig jaar.
+ *
+ * Eén bron van waarheid: zowel de signalen (buildAttivaSignals) als het
+ * maandrapport gebruiken deze keuze, zodat KPI's, gezondheidsscore en
+ * aandachtspunten altijd over hetzelfde jaar gaan.
+ */
+export async function selectAttivaFinancialCache(
+  admin: AdminClient,
+): Promise<AttivaFinancialCache | null> {
+  const huidigJaar = new Date().getFullYear();
+  let beste: AttivaFinancialCache | null = null;
+  let bestePeriode = 0;
+
+  for (const tryJaar of [huidigJaar, huidigJaar - 1, huidigJaar - 2]) {
+    const cacheKey = `${tryJaar}-${tryJaar - 1}`;
+    const { data: row } = await admin
+      .from("exact_data_cache")
+      .select("data, updated_at")
+      .eq("client_name", "attiva")
+      .eq("cache_key", cacheKey)
+      .maybeSingle();
+    if (!row?.data) continue;
+
+    const cacheData = row.data as { huidig?: { pl?: PlRow[] }; pl?: PlRow[] };
+    const pl = cacheData.huidig?.pl ?? cacheData.pl ?? [];
+    let maxPeriode = 0;
+    for (const r of pl) {
+      if (r.Period >= 1 && r.Period <= 12 && r.Period > maxPeriode) {
+        maxPeriode = r.Period;
+      }
+    }
+
+    if (maxPeriode > bestePeriode) {
+      beste = { data: row.data, updatedAt: row.updated_at, jaar: tryJaar, maxPeriode, cacheKey };
+      bestePeriode = maxPeriode;
+    }
+  }
+
+  return beste;
+}
+
 /**
  * Bouwt de complete set Attiva-signalen op (Exact-koppeling, crediteuren,
  * marge, verouderde data, budget- en cliënt-checks) en sorteert ze op
@@ -83,52 +139,17 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
   }
 
   const slug = "attiva"; // alleen Attiva heeft Exact-data
-
-  // Zoek de FINANCIËLE cache (key-format "YYYY-YYYY", bv "2025-2024").
-  // Niet zomaar de meest recente cache — die kan een AI-cache zijn (insights-2025,
-  // narratief-2025, omzet-per-klant-..., enz.) zonder pl/crediteuren.
-  //
-  // We pakken de cache met de HOOGSTE maand-coverage (maxPeriode) — anders
-  // wint een partial-jaar 2026 cache (jan-only, 5 pl-rijen, verlies €4k)
-  // van een volle 2025-cache (12 maanden, verlies €48k). AttivaCharts doet
-  // auto-fallback naar het jaar mét data; notifications moet hetzelfde
-  // jaar tonen anders raken de twee blokken uit sync.
   const huidigJaar = new Date().getFullYear();
-  let cacheRow: { data: unknown; updated_at: string } | null = null;
-  let bestePeriode = 0;
-  for (const tryJaar of [huidigJaar, huidigJaar - 1, huidigJaar - 2]) {
-    const tryKey = `${tryJaar}-${tryJaar - 1}`;
-    const { data: row } = await admin
-      .from("exact_data_cache")
-      .select("data, updated_at")
-      .eq("client_name", slug)
-      .eq("cache_key", tryKey)
-      .maybeSingle();
-    if (!row?.data) continue;
 
-    // Bepaal maand-coverage: hoogste periode (1-12) in de pl-rijen.
-    const cacheData = row.data as {
-      huidig?: { pl?: PlRow[] };
-      pl?: PlRow[];
-    };
-    const pl = cacheData.huidig?.pl ?? cacheData.pl ?? [];
-    let maxPeriode = 0;
-    for (const r of pl) {
-      if (r.Period >= 1 && r.Period <= 12 && r.Period > maxPeriode) {
-        maxPeriode = r.Period;
-      }
-    }
+  // Kies de financiële cache via de gedeelde helper (hoogste maand-dekking).
+  // Het maandrapport gebruikt exact dezelfde keuze, zodat KPI's,
+  // gezondheidsscore en aandachtspunten nooit over verschillende jaren gaan.
+  const financien = await selectAttivaFinancialCache(admin);
 
-    if (maxPeriode > bestePeriode) {
-      cacheRow = row;
-      bestePeriode = maxPeriode;
-    }
-  }
+  if (financien) {
+    attivaLastRefresh = financien.updatedAt;
 
-  if (cacheRow?.data) {
-    attivaLastRefresh = cacheRow.updated_at;
-
-    const cache = cacheRow.data as {
+    const cache = financien.data as {
       huidig?: { crediteuren?: CrediteurRow[]; pl?: PlRow[] };
       crediteuren?: CrediteurRow[];
       pl?: PlRow[];
@@ -193,7 +214,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
     }
 
     // Cache verouderd? (>24u)
-    const cacheAgeMs = Date.now() - new Date(cacheRow.updated_at).getTime();
+    const cacheAgeMs = Date.now() - new Date(financien.updatedAt).getTime();
     if (cacheAgeMs > 24 * 60 * 60 * 1000) {
       notifications.push({
         id: `cache-stale-${slug}`,
