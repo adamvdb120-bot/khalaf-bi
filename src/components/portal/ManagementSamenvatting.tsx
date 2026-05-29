@@ -551,23 +551,28 @@ function KpiTile({
   }[accent];
 
   return (
-    <div className="rounded-xl bg-white border border-gray-100 p-4 relative">
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">{label}</p>
-      <p className={`text-2xl font-bold leading-tight ${valueColor}`}>{value}</p>
-      <div className="flex items-center justify-between gap-2 mt-2">
-        {sub && <p className="text-[10px] text-gray-400 truncate">{sub}</p>}
+    <div className="flex flex-col h-full rounded-xl bg-white border border-gray-200/70 p-4">
+      {/* Kop: label links, trendbadge rechtsboven */}
+      <div className="flex items-start justify-between gap-2 min-h-[16px]">
+        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{label}</p>
         {yoyPct !== null && <YoyBadge value={yoyPct} inverse={yoyInverse} asPp={yoyAsPp} />}
       </div>
-      {onWaarom && (
-        <button
-          onClick={onWaarom}
-          className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold text-navy-700 bg-navy-700/5 hover:bg-navy-700/10 px-2 py-1 rounded-md transition-colors"
-          title="Waarom-analyse openen"
-        >
-          <HelpCircle size={11} />
-          Waarom?
-        </button>
-      )}
+      {/* Hoofdwaarde — groot en rustig */}
+      <p className={`text-[28px] font-bold leading-none mt-2.5 ${valueColor}`}>{value}</p>
+      {/* Voet: vergelijking links, Waarom-link rechts — onderaan voor gelijke hoogte */}
+      <div className="flex items-center justify-between gap-2 mt-auto pt-3">
+        {sub ? <p className="text-[10px] text-gray-400 truncate">{sub}</p> : <span />}
+        {onWaarom && (
+          <button
+            onClick={onWaarom}
+            className="inline-flex items-center gap-1 text-[10px] font-semibold text-navy-700/70 hover:text-navy-700 transition-colors flex-shrink-0"
+            title="Waarom-analyse openen"
+          >
+            <HelpCircle size={11} />
+            Waarom?
+          </button>
+        )}
+      </div>
     </div>
   );
 }

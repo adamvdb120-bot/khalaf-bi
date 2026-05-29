@@ -145,6 +145,32 @@ export default function Takenlijst({ refreshKey = 0 }: TakenlijstProps) {
     genegeerd: taken.filter(t => t.status === "genegeerd").length,
   };
 
+  // Compacte lege staat — zonder taken nemen header + filtertabs + lege-tekst
+  // onnodig veel ruimte in. Toon dan alleen een slanke balk met de toevoeg-knop.
+  // Zodra de gebruiker op toevoegen klikt valt 'ie door naar de volledige kaart.
+  if (!loading && !error && taken.length === 0 && !addingOpen) {
+    return (
+      <div className="card flex items-center justify-between gap-3 py-3.5">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-navy-700/5 rounded-lg flex items-center justify-center">
+            <ListChecks size={14} className="text-navy-700" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-navy-700">Takenlijst</h3>
+            <p className="text-[10px] text-gray-400">Geen open taken</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setAddingOpen(true)}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-navy-700 bg-navy-700/5 hover:bg-navy-700/10 px-2.5 py-1.5 rounded-lg transition-colors"
+        >
+          <Plus size={12} />
+          Taak toevoegen
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       {/* Header */}

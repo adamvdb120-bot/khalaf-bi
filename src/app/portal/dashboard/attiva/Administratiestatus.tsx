@@ -82,6 +82,9 @@ export default function Administratiestatus({ jaar }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [openMaand, setOpenMaand] = useState<number | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  // Standaard ingeklapt — werkmodus-tool, niet de eerste scan. De header toont
+  // wel de samenvatting (X/12 afgesloten) zodat de status in één oogopslag duidelijk is.
+  const [collapsed, setCollapsed] = useState(true);
   // Notitie-edit state (key = maand)
   const [editingNotitieMaand, setEditingNotitieMaand] = useState<number | null>(null);
   const [notitieValue, setNotitieValue] = useState("");
@@ -153,8 +156,11 @@ export default function Administratiestatus({ jaar }: Props) {
 
   return (
     <div className="card">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      {/* Header — klikbaar om in/uit te klappen */}
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        className="flex items-start justify-between gap-3 w-full text-left"
+      >
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 bg-navy-700/5 rounded-lg flex items-center justify-center">
             <ClipboardCheck size={14} className="text-navy-700" />
@@ -167,7 +173,12 @@ export default function Administratiestatus({ jaar }: Props) {
             </p>
           </div>
         </div>
-      </div>
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 hover:text-navy-700 flex-shrink-0 mt-1">
+          {collapsed ? <>Tonen <ChevronDown size={12} /></> : <>Verbergen <ChevronUp size={12} /></>}
+        </span>
+      </button>
+
+      {!collapsed && <div className="mt-4">
 
       {loading && (
         <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2">
@@ -366,6 +377,8 @@ export default function Administratiestatus({ jaar }: Props) {
           })()}
         </>
       )}
+
+      </div>}
     </div>
   );
 }

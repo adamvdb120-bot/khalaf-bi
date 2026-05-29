@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkClientAccess } from "@/lib/portal/access";
+import { selectAttivaFinancialCache } from "@/lib/portal/signals";
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 uur
 
@@ -25,18 +26,55 @@ export async function GET(req: Request) {
   const refresh = url.searchParams.get("refresh") === "1";
 
   const admin = createAdminClient();
-  const cacheKey = `narratief-${jaar}`;
-  const dataKey = `${jaar}-${jaar - 1}`;
 
-  // Eerst de financiele data ophalen — we hebben de updated_at nodig om te
-  // kunnen vergelijken met onze narratief-cache (anders showen we oude AI-tekst
-  // bij verse data → KPI's en samenvatting raken uit sync).
-  const { data: dataRow } = await admin
+  // ─── Databron kiezen — gelijk aan KPI's, signalen en maandmail ───────────
+  // Voorkeur: de cache van het gevraagde jaar. Maar als dat jaar (nog) geen
+  // omzet heeft — bv. een net begonnen 2026 — dan zou de AI "omzet €0, −100%"
+  // produceren terwijl de KPI's het laatste volledige jaar tonen. In dat geval
+  // vallen we terug op dezelfde max-coverage cache als de signalen/maandmail,
+  // zodat deze kaart altijd over hetzelfde jaar praat als de cijfers erboven.
+  type CacheShape = {
+    huidig?: { jaar?: number; pl?: PlRow[]; crediteuren?: AgedRow[] };
+    vorig?: { pl?: PlRow[] };
+    pl?: PlRow[];
+    crediteuren?: AgedRow[];
+  };
+  function omzetVan(d: CacheShape | null | undefined): number {
+    if (!d) return 0;
+    const rows = d.huidig?.pl ?? d.pl ?? [];
+    return rows
+      .filter(r => r.IsRevenue && r.Period >= 1 && r.Period <= 12)
+      .reduce((s, r) => s + r.Amount, 0);
+  }
+
+  const requestedKey = `${jaar}-${jaar - 1}`;
+  const { data: requestedRow } = await admin
     .from("exact_data_cache")
     .select("data, updated_at")
     .eq("client_name", "attiva")
-    .eq("cache_key", dataKey)
-    .single();
+    .eq("cache_key", requestedKey)
+    .maybeSingle();
+
+  let sourceData: CacheShape | null = null;
+  let sourceUpdatedAt: string | null = null;
+  let dataJaar = jaar;
+
+  if (requestedRow?.data && omzetVan(requestedRow.data as CacheShape) > 0) {
+    sourceData = requestedRow.data as CacheShape;
+    sourceUpdatedAt = requestedRow.updated_at;
+    dataJaar = sourceData.huidig?.jaar ?? jaar;
+  } else {
+    const financien = await selectAttivaFinancialCache(admin);
+    if (financien) {
+      sourceData = financien.data as CacheShape;
+      sourceUpdatedAt = financien.updatedAt;
+      dataJaar = financien.jaar;
+    }
+  }
+
+  // De AI-tekst-cache keyt op het JAAR dat we daadwerkelijk gebruiken, zodat een
+  // oude (foute) tekst van een leeg jaar nooit hergebruikt wordt.
+  const cacheKey = `narratief-${dataJaar}`;
 
   if (!refresh) {
     const { data: cached } = await admin
@@ -44,43 +82,36 @@ export async function GET(req: Request) {
       .select("data, updated_at")
       .eq("client_name", "attiva")
       .eq("cache_key", cacheKey)
-      .single();
+      .maybeSingle();
     if (cached) {
       const age = Date.now() - new Date(cached.updated_at).getTime();
       const cacheVers = age < CACHE_TTL_MS;
       // Cache alleen geldig als hij óók nieuwer is dan de onderliggende
       // financiele data. Anders: data is ververst → AI-tekst regenereren.
-      const dataIsNieuwer = dataRow
-        && new Date(dataRow.updated_at).getTime() > new Date(cached.updated_at).getTime();
+      const dataIsNieuwer = sourceUpdatedAt
+        && new Date(sourceUpdatedAt).getTime() > new Date(cached.updated_at).getTime();
       if (cacheVers && !dataIsNieuwer) {
         return NextResponse.json({ ...(cached.data as object), cached: true, age_seconds: Math.round(age / 1000) });
       }
     }
   }
 
-  if (!dataRow) {
+  if (!sourceData) {
     return NextResponse.json({
       samenvatting: "Open eerst het Financieel-tab zodat data uit Exact opgehaald wordt — daarna verschijnt hier de samenvatting.",
-      punten: [],
+      aanbeveling: "",
     });
   }
 
-  // Legacy: data zat platgeslagen op root. Nieuw: genest onder `huidig` / `vorig`.
-  const fullData = dataRow.data as {
-    huidig?: { jaar: number; pl: PlRow[]; crediteuren: AgedRow[] };
-    vorig?: { pl: PlRow[] };
-    pl?: PlRow[];
-    crediteuren?: AgedRow[];
-  };
+  const fullData = sourceData;
   const pl: PlRow[] = fullData.huidig?.pl ?? fullData.pl ?? [];
   const vorigPl: PlRow[] = fullData.vorig?.pl ?? [];
   const crediteuren: AgedRow[] = fullData.huidig?.crediteuren ?? fullData.crediteuren ?? [];
-  const dataJaar: number = fullData.huidig?.jaar ?? jaar;
 
   if (pl.length === 0) {
     return NextResponse.json({
-      samenvatting: `Nog geen P&L-data voor ${jaar}. Zodra er Exact-boekingen verschijnen, komt hier de verhaallijn.`,
-      punten: [],
+      samenvatting: `Nog geen P&L-data voor ${dataJaar}. Zodra er Exact-boekingen verschijnen, komt hier de verhaallijn.`,
+      aanbeveling: "",
     });
   }
 
@@ -99,6 +130,16 @@ export async function GET(req: Request) {
   const totaalOmzet = maanden.reduce((s, m) => s + m.omzet, 0);
   const totaalKosten = maanden.reduce((s, m) => s + m.kosten, 0);
   const margePct = totaalOmzet > 0 ? ((totaalOmzet - totaalKosten) / totaalOmzet) * 100 : 0;
+
+  // Vangnet: zonder omzet kan de AI alleen onzin maken ("omzet €0, −100%").
+  // Geef dan een rustige boodschap zonder harde bedragen i.p.v. de KPI's tegen
+  // te spreken.
+  if (totaalOmzet <= 0) {
+    return NextResponse.json({
+      samenvatting: `Er is voor ${dataJaar} nog onvoldoende omzetdata om een betrouwbare analyse te maken.`,
+      aanbeveling: "Controleer of de Exact-koppeling de meest recente boekingen heeft opgehaald.",
+    });
+  }
 
   // Vorig jaar same period
   const maxPeriode = Math.max(...maanden.map(m => m.periode));
