@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildAttivaSignals } from "@/lib/portal/signals";
+import { buildAttivaOverzicht, type Klantgezondheid } from "@/lib/portal/signals";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -78,21 +78,26 @@ export default async function AdminPage() {
     admin.from("profiles").select("id, full_name, company, role, created_at").eq("role", "client").order("created_at", { ascending: false }),
     admin.from("uploads").select("id, user_id, name, created_at").order("created_at", { ascending: false }).limit(20),
     admin.from("attiva_doelen").select("jaar, updated_at").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
-    buildAttivaSignals(admin),
+    buildAttivaOverzicht(admin),
   ]);
 
   const profiles = profilesRes.data ?? [];
   const uploads = uploadsRes.data ?? [];
   const laatsteDoelen = doelenRes.data;
-  const { notifications: signalen, attivaLastRefresh } = signalsResult;
+  const { notifications: signalen, attivaLastRefresh, openTaken, gezondheid } = signalsResult;
 
-  // Open meldingen + laatste data-refresh per klant. Alleen Attiva heeft
-  // (nog) een eigen signaalbron en Exact-cache; andere klanten tonen 0 / —.
-  const meldingenPerKlant: Record<string, { open: number; alarm: number; laatsteRefresh: string | null }> = {
+  // Kerncijfers per klant. Alleen Attiva heeft (nog) een eigen signaalbron,
+  // Exact-cache en takenlijst; andere klanten tonen 0 / — / "Nog geen data".
+  const meldingenPerKlant: Record<string, {
+    open: number; alarm: number; laatsteRefresh: string | null;
+    openTaken: number; gezondheid: Klantgezondheid;
+  }> = {
     attiva: {
       open: signalen.length,
       alarm: signalen.filter(s => s.severity === "alarm").length,
       laatsteRefresh: attivaLastRefresh,
+      openTaken,
+      gezondheid,
     },
   };
 
@@ -274,6 +279,12 @@ export default async function AdminPage() {
                       )}
                     </div>
                     <p className="text-xs text-gray-600 truncate">{s.beschrijving}</p>
+                    {s.actie && (
+                      <p className={`mt-1 flex items-start gap-1 text-[11px] font-semibold ${ernstStyle.text}`}>
+                        <ArrowRight size={12} className="flex-shrink-0 mt-px" />
+                        <span className="truncate">{s.actie}</span>
+                      </p>
+                    )}
                   </div>
                   {s.bedrag && (
                     <div className={`text-sm font-bold ${ernstStyle.text} flex-shrink-0`}>{s.bedrag}</div>
@@ -297,6 +308,15 @@ export default async function AdminPage() {
               const openMeldingen = m?.open ?? 0;
               const heeftAlarm = (m?.alarm ?? 0) > 0;
               const laatsteRefresh = m?.laatsteRefresh ?? null;
+              const openTakenKlant = m?.openTaken ?? 0;
+              const gez = m?.gezondheid ?? null;
+              const gezStyle = gez
+                ? {
+                    groen: { dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50" },
+                    oranje: { dot: "bg-amber-500", text: "text-amber-700", bg: "bg-amber-50" },
+                    rood: { dot: "bg-red-500", text: "text-red-700", bg: "bg-red-50" },
+                  }[gez.kleur]
+                : null;
               return (
                 <Link
                   key={client.id}
@@ -312,10 +332,19 @@ export default async function AdminPage() {
                       <div className="font-bold text-navy-700 leading-tight text-sm truncate">{client.name}</div>
                       <div className="text-[11px] text-gray-400 mt-0.5 truncate">{client.sector}</div>
                     </div>
-                    {openMeldingen > 0 && (
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        heeftAlarm ? "bg-red-500" : "bg-amber-500"
-                      } animate-pulse`} />
+                    {gez && gezStyle ? (
+                      <span
+                        title={gez.redenen.join(" · ")}
+                        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 ${gezStyle.bg} ${gezStyle.text}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${gezStyle.dot} ${gez.kleur === "rood" ? "animate-pulse" : ""}`} />
+                        {gez.label}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 bg-gray-100 text-gray-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                        Nog geen data
+                      </span>
                     )}
                   </div>
 
@@ -344,18 +373,23 @@ export default async function AdminPage() {
                   </div>
 
                   <div className="flex items-center justify-between text-xs">
-                    {client.status === "actief" ? (
-                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                        Actief
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-amber-700">
-                        <Clock size={10} />
-                        In aanbouw
-                      </span>
-                    )}
-                    <span className="text-gray-400 group-hover:text-navy-700 transition-colors flex items-center gap-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {client.status === "actief" ? (
+                        <span className="inline-flex items-center gap-1.5 text-emerald-700 flex-shrink-0">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                          Actief
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-amber-700 flex-shrink-0">
+                          <Clock size={10} />
+                          In aanbouw
+                        </span>
+                      )}
+                      {openTakenKlant > 0 && (
+                        <span className="text-gray-400 truncate">· {openTakenKlant} open {openTakenKlant === 1 ? "taak" : "taken"}</span>
+                      )}
+                    </div>
+                    <span className="text-gray-400 group-hover:text-navy-700 transition-colors flex items-center gap-1 flex-shrink-0">
                       Open <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
                     </span>
                   </div>

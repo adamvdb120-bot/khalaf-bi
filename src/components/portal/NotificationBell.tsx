@@ -13,6 +13,7 @@ interface Notification {
   severity: "alarm" | "attention" | "info";
   titel: string;
   beschrijving: string;
+  actie?: string;
   href: string;
   klant?: string;
   bedrag?: string;
@@ -169,6 +170,12 @@ export default function NotificationBell() {
                           )}
                         </div>
                         <p className="text-[11px] text-gray-500 leading-snug">{n.beschrijving}</p>
+                        {n.actie && (
+                          <p className={`mt-1 flex items-start gap-1 text-[11px] font-semibold ${sev.text}`}>
+                            <ArrowRight size={11} className="flex-shrink-0 mt-px" />
+                            <span className="leading-snug">{n.actie}</span>
+                          </p>
+                        )}
                         {n.klant && (
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mt-1">
                             {n.klant}

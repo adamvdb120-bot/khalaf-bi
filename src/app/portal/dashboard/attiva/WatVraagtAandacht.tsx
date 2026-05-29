@@ -19,6 +19,7 @@ interface Notification {
   severity: "alarm" | "attention" | "info";
   titel: string;
   beschrijving: string;
+  actie?: string;
   href: string;
   klant?: string;
   bedrag?: string;
@@ -157,6 +158,7 @@ export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Pr
           severity: "alarm",
           titel: "Negatief jaarresultaat",
           beschrijving: `Verlies van ${euro(Math.abs(marge))} — kosten overstijgen omzet`,
+          actie: "Analyseer de grootste kostenposten en bespreek bijsturing.",
           href: "/portal/dashboard/attiva#sectie-marge",
           klant: "Attiva Zorg",
           bedrag: `${margePct.toFixed(1)}%`,
@@ -168,6 +170,7 @@ export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Pr
           severity: "attention",
           titel: "Zeer dunne marge",
           beschrijving: `Brutomarge is slechts ${margePct.toFixed(1)}% — onder kritische drempel`,
+          actie: "Bekijk waar marge weglekt — kosten of tarieven — en stuur bij.",
           href: "/portal/dashboard/attiva#sectie-marge",
           klant: "Attiva Zorg",
           bedrag: `${margePct.toFixed(1)}%`,
@@ -190,6 +193,9 @@ export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Pr
           beschrijving: topUrgent
             ? `Grootste: ${topUrgent.Name} (${euro(topUrgent.Age90Plus)})`
             : "Bekijk welke leveranciers contact nodig hebben",
+          actie: topUrgent
+            ? `Neem contact op met ${topUrgent.Name} en plan de betaling in.`
+            : "Bel de grootste openstaande leveranciers en plan betaling.",
           href: "/portal/dashboard/attiva?tab=crediteuren",
           klant: "Attiva Zorg",
           bedrag: euro(totaal90Plus),
@@ -301,6 +307,12 @@ export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Pr
                   <p className={`text-sm font-bold ${sev.titelKleur}`}>{n.titel}</p>
                 </div>
                 <p className="text-xs text-gray-600 leading-snug">{n.beschrijving}</p>
+                {n.actie && (
+                  <p className={`mt-1 inline-flex items-start gap-1 text-[11px] font-semibold ${sev.titelKleur}`}>
+                    <ArrowRight size={12} className="flex-shrink-0 mt-px" />
+                    <span>{n.actie}</span>
+                  </p>
+                )}
               </div>
               {n.bedrag && (
                 <span className={`text-xs font-semibold ${sev.titelKleur} opacity-80 flex-shrink-0 self-center`}>

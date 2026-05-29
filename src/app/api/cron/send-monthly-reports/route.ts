@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { buildAttivaOverzicht, type Notification, type Klantgezondheid } from "@/lib/portal/signals";
 
 /**
  * Cron job: stuurt elke 1e van de maand een maandrapport per email naar de klant.
@@ -33,6 +34,70 @@ function pct(v: number) {
   return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 }
 
+// Escape voor HTML-email: titels/beschrijvingen bevatten klant- en
+// crediteurnamen die '&', '<' enz. kunnen bevatten.
+function esc(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const SEV_COLOR: Record<Notification["severity"], string> = {
+  alarm: "#ef4444",
+  attention: "#f59e0b",
+  info: "#3b82f6",
+};
+
+const GEZ_STYLE: Record<Klantgezondheid["kleur"], { color: string; bg: string }> = {
+  groen: { color: "#10b981", bg: "#ecfdf5" },
+  oranje: { color: "#f59e0b", bg: "#fffbeb" },
+  rood: { color: "#ef4444", bg: "#fef2f2" },
+};
+
+/** Gezondheid-blok voor in de email (na de titel). */
+function buildGezondheidHtml(gezondheid: Klantgezondheid) {
+  const s = GEZ_STYLE[gezondheid.kleur];
+  return `
+        <tr><td style="padding:0 40px 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:${s.bg};border-radius:12px;border-left:4px solid ${s.color};">
+            <tr><td style="padding:16px 20px;">
+              <div style="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Klantgezondheid</div>
+              <div style="color:${s.color};font-size:18px;font-weight:bold;margin-top:4px;">${esc(gezondheid.label)}</div>
+              <div style="color:#64748b;font-size:12px;margin-top:4px;">${esc(gezondheid.redenen.join(" · "))}</div>
+            </td></tr>
+          </table>
+        </td></tr>`;
+}
+
+/** Aandachtspunten + voorgestelde acties (na het YTD-blok). */
+function buildAandachtspuntenHtml(signals: Notification[]) {
+  const top = signals.slice(0, 5);
+  const items = top.length === 0
+    ? `<div style="color:#10b981;font-size:13px;font-weight:600;">&#10003; Geen openstaande aandachtspunten — alles loopt soepel.</div>`
+    : top.map(n => {
+        const c = SEV_COLOR[n.severity];
+        const actie = n.actie
+          ? `<div style="color:${c};font-size:12px;font-weight:600;margin-top:6px;">&rarr; ${esc(n.actie)}</div>`
+          : "";
+        return `
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;background:#f8fafc;border-radius:10px;border-left:3px solid ${c};">
+            <tr><td style="padding:12px 16px;">
+              <div style="color:#1B3A5C;font-size:13px;font-weight:bold;">${esc(n.titel)}</div>
+              <div style="color:#64748b;font-size:12px;margin-top:2px;">${esc(n.beschrijving)}</div>
+              ${actie}
+            </td></tr>
+          </table>`;
+      }).join("");
+
+  return `
+        <tr><td style="padding:0 40px 30px;">
+          <div style="color:#1B3A5C;font-size:14px;font-weight:bold;margin-bottom:12px;">Aandachtspunten &amp; acties</div>
+          ${items}
+        </td></tr>`;
+}
+
 /** Bouw KPIs voor de afgelopen maand uit de cache data */
 function buildKpis(huidig: ExactData, vorig: ExactData, periode: number) {
   const omzet = huidig.pl.filter(r => r.IsRevenue && r.Period === periode).reduce((s, r) => s + r.Amount, 0);
@@ -56,7 +121,15 @@ function buildKpis(huidig: ExactData, vorig: ExactData, periode: number) {
   };
 }
 
-function buildEmailHtml(klantNaam: string, periodeNaam: string, jaar: number, kpis: ReturnType<typeof buildKpis>, dashboardUrl: string) {
+function buildEmailHtml(
+  klantNaam: string,
+  periodeNaam: string,
+  jaar: number,
+  kpis: ReturnType<typeof buildKpis>,
+  dashboardUrl: string,
+  gezondheid: Klantgezondheid | null,
+  signals: Notification[],
+) {
   const trendColor = (v: number) => v > 0 ? "#10b981" : v < 0 ? "#ef4444" : "#94a3b8";
   const trendArrow = (v: number) => v > 0 ? "↗" : v < 0 ? "↘" : "→";
 
@@ -81,6 +154,7 @@ function buildEmailHtml(klantNaam: string, periodeNaam: string, jaar: number, kp
           <h1 style="color:#1B3A5C;font-size:26px;margin:8px 0 0;font-weight:700;">Maandrapport ${klantNaam}</h1>
           <p style="color:#64748b;font-size:14px;margin:12px 0 0;line-height:1.6;">Hieronder vindt u de belangrijkste cijfers van afgelopen maand.</p>
         </td></tr>
+${gezondheid ? buildGezondheidHtml(gezondheid) : ""}
 
         <!-- KPI Grid -->
         <tr><td style="padding:0 40px 30px;">
@@ -120,6 +194,7 @@ function buildEmailHtml(klantNaam: string, periodeNaam: string, jaar: number, kp
             </td></tr>
           </table>
         </td></tr>
+${buildAandachtspuntenHtml(signals)}
 
         <!-- CTA -->
         <tr><td align="center" style="padding:0 40px 40px;">
@@ -201,9 +276,20 @@ export async function GET(req: Request) {
       const data = cacheRow.data as { huidig: ExactData; vorig: ExactData };
       const kpis = buildKpis(data.huidig, data.vorig, periodeNummer);
 
+      // Aandachtspunten + acties + gezondheidsscore uit de gedeelde signaalbron.
+      // Alleen Attiva heeft (nu) een eigen overzicht; andere klanten krijgen geen blok.
+      let gezondheid: Klantgezondheid | null = null;
+      let signals: Notification[] = [];
+      if (klant.slug === "attiva") {
+        const overzicht = await buildAttivaOverzicht(admin);
+        gezondheid = overzicht.gezondheid;
+        signals = overzicht.notifications;
+      }
+
       const html = buildEmailHtml(
         klant.naam, periodeNaam, periodeJaar, kpis,
-        `${baseUrl}/portal/dashboard/${klant.slug}`
+        `${baseUrl}/portal/dashboard/${klant.slug}`,
+        gezondheid, signals,
       );
 
       const sendResult = await resend.emails.send({

@@ -11,6 +11,8 @@ export interface Notification {
   severity: "alarm" | "attention" | "info";
   titel: string;
   beschrijving: string;
+  /** Concrete, voorgestelde vervolgactie ("Wat moet ik nu doen?"). */
+  actie?: string;
   href: string;
   klant?: string;
   bedrag?: string;
@@ -56,6 +58,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
       severity: "alarm",
       titel: "Exact Online niet gekoppeld",
       beschrijving: "Geen actieve koppeling — koppel opnieuw om data te kunnen vernieuwen.",
+      actie: "Koppel Exact Online opnieuw via Instellingen.",
       href: "/portal/instellingen",
       klant: "Attiva Zorg",
     });
@@ -72,6 +75,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
         severity: "alarm",
         titel: "Exact Online koppeling verlopen",
         beschrijving: "Auto-refresh van token mislukt. Koppel opnieuw om data te ontvangen.",
+        actie: "Log opnieuw in bij Exact via Instellingen om de koppeling te herstellen.",
         href: "/portal/instellingen",
         klant: "Attiva Zorg",
       });
@@ -147,6 +151,9 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
         beschrijving: topUrgent
           ? `Grootste: ${topUrgent.Name} (${euro(topUrgent.Age90Plus)})`
           : "Bekijk welke leveranciers contact nodig hebben",
+        actie: topUrgent
+          ? `Neem contact op met ${topUrgent.Name} en plan de betaling in.`
+          : "Bel de grootste openstaande leveranciers en plan betaling.",
         // ?tab=crediteuren wordt door AttivaTabs gelezen om direct de tab te openen
         href: "/portal/dashboard/attiva?tab=crediteuren",
         klant: "Attiva Zorg",
@@ -167,6 +174,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
         severity: "alarm",
         titel: "Negatief jaarresultaat",
         beschrijving: `Verlies van ${euro(Math.abs(marge))} — kosten overstijgen omzet`,
+        actie: "Analyseer de grootste kostenposten en bespreek bijsturing.",
         href: "/portal/dashboard/attiva#sectie-marge",
         klant: "Attiva Zorg",
         bedrag: `${margePct.toFixed(1)}%`,
@@ -178,6 +186,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
         severity: "attention",
         titel: "Zeer dunne marge",
         beschrijving: `Brutomarge is slechts ${margePct.toFixed(1)}% — onder kritische drempel`,
+        actie: "Bekijk waar marge weglekt — kosten of tarieven — en stuur bij.",
         href: "/portal/dashboard/attiva#sectie-marge",
         klant: "Attiva Zorg",
       });
@@ -192,6 +201,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
         severity: "info",
         titel: "Data is meer dan 24 uur oud",
         beschrijving: "Klik vernieuwen op het dashboard voor verse cijfers",
+        actie: "Klik op 'Vernieuwen' op het dashboard om de cijfers bij te werken.",
         href: "/portal/dashboard/attiva",
         klant: "Attiva Zorg",
       });
@@ -279,6 +289,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
       severity: "alarm",
       titel: `${overBudget.length} ${overBudget.length === 1 ? "cliënt is" : "cliënten zijn"} over budget`,
       beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (+${euro(c.over)})`).join(", "),
+      actie: "Controleer deze cliënten en verhoog het budget of beperk de inzet.",
       href: "/portal/dashboard/attiva?tab=declaraties#clientenoverzicht",
       klant: "Attiva Zorg",
     });
@@ -292,6 +303,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
       severity: "attention",
       titel: `${bijnaOpBudget.length} ${bijnaOpBudget.length === 1 ? "cliënt" : "cliënten"} bijna op jaarbudget`,
       beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (${c.pct.toFixed(0)}%)`).join(", "),
+      actie: "Plan een budgetgesprek voordat het jaarbudget op is.",
       href: "/portal/dashboard/attiva?tab=declaraties#clientenoverzicht",
       klant: "Attiva Zorg",
     });
@@ -309,6 +321,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
       severity: "attention",
       titel: `${zonderBudgetActief.length} ${zonderBudgetActief.length === 1 ? "cliënt heeft" : "cliënten hebben"} geen jaarbudget`,
       beschrijving: `${namenTekst} — stel budgetten in voor goede monitoring.`,
+      actie: `Stel jaarbudgetten in voor ${zonderBudgetActief.length === 1 ? "deze cliënt" : "deze cliënten"} bij Declaraties.`,
       href: "/portal/dashboard/attiva?tab=declaraties#clientenoverzicht",
       klant: "Attiva Zorg",
     });
@@ -343,6 +356,7 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
         severity: "attention",
         titel: `${weggevallen.length} ${weggevallen.length === 1 ? "cliënt lijkt" : "cliënten lijken"} weggevallen`,
         beschrijving: sorted.slice(0, 3).map(c => `${c.naam} (was ${euro(c.vorig)})`).join(", "),
+        actie: "Bel de cliënt(en) om te checken of de zorg en declaraties doorlopen.",
         href: "/portal/dashboard/attiva?tab=declaraties#omzet-per-client",
         klant: "Attiva Zorg",
       });
@@ -363,4 +377,85 @@ export async function buildAttivaSignals(admin: AdminClient): Promise<AttivaSign
   });
 
   return { notifications, attivaLastRefresh };
+}
+
+// ─── Klantgezondheid-score ───────────────────────────────────────────────────
+// Eén simpele stoplicht-score per klant, afgeleid uit dezelfde signalen:
+//   rood   = actie nodig (er staat minstens één urgent signaal open)
+//   oranje = aandacht nodig (aandachtspunten, verouderde data of veel open taken)
+//   groen  = alles rustig
+// Bewust een afgeleide van buildAttivaSignals zodat score en meldingen nooit
+// uit elkaar lopen.
+
+export type GezondheidKleur = "groen" | "oranje" | "rood";
+
+export interface Klantgezondheid {
+  kleur: GezondheidKleur;
+  label: string;
+  redenen: string[];
+}
+
+// Drempel: vanaf zoveel open taken telt het mee als "aandacht nodig".
+const OPEN_TAKEN_DREMPEL = 5;
+const DATA_OUD_MS = 24 * 60 * 60 * 1000;
+
+export function computeKlantgezondheid(
+  signals: Notification[],
+  openTaken: number,
+  lastRefresh: string | null,
+): Klantgezondheid {
+  const alarmCount = signals.filter(s => s.severity === "alarm").length;
+  const attentionCount = signals.filter(s => s.severity === "attention").length;
+  const geenData = !lastRefresh;
+  const dataOud = !geenData && (Date.now() - new Date(lastRefresh).getTime()) > DATA_OUD_MS;
+  const veelTaken = openTaken >= OPEN_TAKEN_DREMPEL;
+
+  const redenen: string[] = [];
+  if (alarmCount > 0) redenen.push(`${alarmCount} urgente melding${alarmCount === 1 ? "" : "en"}`);
+  if (attentionCount > 0) redenen.push(`${attentionCount} aandachtspunt${attentionCount === 1 ? "" : "en"}`);
+  if (geenData) redenen.push("Geen recente data");
+  else if (dataOud) redenen.push("Data ouder dan 24 uur");
+  if (veelTaken) redenen.push(`${openTaken} open taken`);
+
+  let kleur: GezondheidKleur;
+  let label: string;
+  if (alarmCount > 0) {
+    kleur = "rood";
+    label = "Actie nodig";
+  } else if (attentionCount > 0 || geenData || dataOud || veelTaken) {
+    kleur = "oranje";
+    label = "Aandacht nodig";
+  } else {
+    kleur = "groen";
+    label = "Alles rustig";
+    redenen.push("Geen openstaande signalen");
+  }
+
+  return { kleur, label, redenen };
+}
+
+export interface AttivaOverzicht {
+  notifications: Notification[];
+  attivaLastRefresh: string | null;
+  openTaken: number;
+  gezondheid: Klantgezondheid;
+}
+
+/**
+ * Volledig klantoverzicht voor admin-klantkaart en maandrapport: signalen +
+ * open taken + afgeleide gezondheidsscore. /api/notifications gebruikt bewust
+ * alleen buildAttivaSignals (geen taken-query nodig voor de bel).
+ */
+export async function buildAttivaOverzicht(admin: AdminClient): Promise<AttivaOverzicht> {
+  const { notifications, attivaLastRefresh } = await buildAttivaSignals(admin);
+
+  const { count } = await admin
+    .from("client_taken")
+    .select("id", { count: "exact", head: true })
+    .eq("client_slug", "attiva")
+    .eq("status", "open");
+  const openTaken = count ?? 0;
+
+  const gezondheid = computeKlantgezondheid(notifications, openTaken, attivaLastRefresh);
+  return { notifications, attivaLastRefresh, openTaken, gezondheid };
 }
