@@ -223,17 +223,31 @@ export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
   const url = new URL(req.url);
   const isManualTest = url.searchParams.get("test") === "1";
-  const cronSecretMatch = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  // Preview-modus: rendert de mail-HTML in de browser i.p.v. te versturen.
+  // Open toegankelijk (verstuurt niets, geen Resend-key nodig).
+  // Gebruik: ?test=1&preview=1
+  const isPreview = url.searchParams.get("preview") === "1";
 
-  if (!cronSecretMatch && !isManualTest) {
+  // Een echte verzending (geplande cron óf handmatige test) vereist het
+  // cron-secret — via de Authorization-header (Vercel-cron) of ?secret=...
+  // (handmatig). Zo kan niemand de URL raden en zomaar een mail laten sturen.
+  const cronSecret = process.env.CRON_SECRET;
+  const secretMatch = !!cronSecret && (
+    authHeader === `Bearer ${cronSecret}` ||
+    url.searchParams.get("secret") === cronSecret
+  );
+
+  // Preview mag open; echt verzenden alleen mét secret.
+  if (!isPreview && !secretMatch) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!process.env.RESEND_API_KEY) {
+  // In preview-modus versturen we niets, dus is een Resend-key niet nodig.
+  if (!isPreview && !process.env.RESEND_API_KEY) {
     return NextResponse.json({ error: "RESEND_API_KEY niet geconfigureerd" }, { status: 500 });
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
   const admin = createAdminClient();
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://khalaf-bi.vercel.app";
@@ -242,8 +256,8 @@ export async function GET(req: Request) {
   const now = new Date();
   let periodeMaand = now.getMonth(); // 0-11
   let periodeJaar = now.getFullYear();
-  if (!isManualTest) {
-    // 1e van de maand → vorige maand rapporteren
+  if (!isManualTest && !isPreview) {
+    // Geplande cron op de 1e van de maand → vorige maand rapporteren
     periodeMaand = periodeMaand - 1;
     if (periodeMaand < 0) { periodeMaand = 11; periodeJaar -= 1; }
   }
@@ -253,7 +267,7 @@ export async function GET(req: Request) {
   const results: Record<string, unknown> = {};
 
   for (const klant of KLANTEN) {
-    if (!klant.email) {
+    if (!isPreview && !klant.email) {
       results[klant.slug] = { skipped: "Geen email geconfigureerd" };
       continue;
     }
@@ -292,7 +306,14 @@ export async function GET(req: Request) {
         gezondheid, signals,
       );
 
-      const sendResult = await resend.emails.send({
+      // Preview: stuur de HTML terug zodat je 'm in de browser kunt bekijken.
+      if (isPreview) {
+        return new NextResponse(html, {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      }
+
+      const sendResult = await resend!.emails.send({
         from: "Khalaf BI <onboarding@resend.dev>",
         to: klant.email,
         subject: `Maandrapport ${klant.naam} — ${periodeNaam} ${periodeJaar}`,
