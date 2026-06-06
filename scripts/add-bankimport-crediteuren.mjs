@@ -35,7 +35,7 @@ for (const r of rows) {
   const bedrag = num(r[I.bedrag]);
   if (isNaN(bedrag)) continue;
   let naam = (r[I.naam] || "").trim();
-  if (/lening/i.test(naam)) continue;                 // privé-leningen niet als leverancier
+  if (/lening/i.test(naam) || /bulhan/i.test(naam)) continue; // privé-leningen + afgeloste lening (S.A. Bulhan) niet als leverancier
   if (!naam) naam = (r[I.soort] || "Onbekend").trim() + " (batch)";
   // normaliseer naam-varianten
   naam = naam.replace(/\s+/g, " ");
@@ -44,10 +44,12 @@ for (const r of rows) {
   map[key].total += bedrag; map[key].n++;
 }
 
+// hernoem betalingen naar hun boekhoudkundige aard
+const RENAME = { "verzamelbetaling (batch)": "Lonen", "f.taniwal": "Huurkosten" };
 const top = Object.values(map).sort((a, b) => b.total - a.total).slice(0, 8);
 // dashboard-shape: totaal in Age0to30 zodat d.totaal klopt; frontend toont GEEN aging-balk bij bankimport
 const crediteuren = top.map(c => ({
-  Name: c.Name, AccountCode: "",
+  Name: RENAME[c.Name.toLowerCase()] ?? c.Name, AccountCode: "",
   Age0to30: Math.round(c.total), Age31to60: 0, Age61to90: 0, Age90Plus: 0,
 }));
 
