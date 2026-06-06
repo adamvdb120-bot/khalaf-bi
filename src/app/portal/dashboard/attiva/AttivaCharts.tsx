@@ -559,12 +559,29 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         </div>
       )}
 
+      {/* Tijdelijke bankimport actief — maakt expliciet dat de narratieve/signaal-
+          blokken (klantgezondheid in de cockpit, sidebar-meldingen) nog op Exact
+          gebaseerd zijn, terwijl de cijfers hier uit de bankimport komen. */}
+      {bron === "bankimport" && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <span>
+            <strong>Tijdelijke bankimport actief voor {jaar}.</strong> De KPI&apos;s, grafieken en
+            categorieën hieronder komen uit een handmatige verwerking van bankmutaties — geen
+            definitieve boekhouding. De klantgezondheid (cockpit) en algemene meldingen zijn nog
+            op Exact gebaseerd. Exact neemt automatisch over zodra {jaar} in Exact is geboekt.
+          </span>
+        </div>
+      )}
+
       {/* "Wat vraagt aandacht?" — komt na de filterbalk zodat duidelijk is
           dat deze meldingen over de geselecteerde periode gaan. Gebruikt
-          dezelfde pl/crediteuren als de KPI-tegels eronder. */}
+          dezelfde pl/crediteuren als de KPI-tegels eronder. Bij bankimport
+          negeren we de Exact-gebaseerde API-meldingen zodat alles uit één bron komt. */}
       <WatVraagtAandacht
         pl={data.pl ?? []}
         crediteuren={data.crediteuren ?? []}
+        negeerApiMeldingen={bron === "bankimport"}
         onTaskCreated={() => setTakenRefreshKey((v) => v + 1)}
       />
 
@@ -578,8 +595,26 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         />
       )}
 
-      {/* 2. AI conclusie — kleine kaart "wat betekent dit?" */}
-      {maandData.length > 0 && <AINarratief jaar={data.jaar} />}
+      {/* 2. AI conclusie — kleine kaart "wat betekent dit?". Bij bankimport tonen
+          we GEEN AI-tekst: die draait op de Exact-cache en zou dan cijfers noemen
+          die niet bij de bankimport-KPI's passen (mismatch). Vaste disclaimer i.p.v. */}
+      {maandData.length > 0 && (
+        bron === "bankimport" ? (
+          <div className="bg-white border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <AlertCircle size={16} className="text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-navy-700 mb-1">Wat betekent dit?</h3>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                Deze {jaar}-cijfers zijn gebaseerd op een tijdelijke bankimport. De automatische
+                analyse en boekhoudkundige signalen worden pas volledig betrouwbaar zodra {jaar} in
+                Exact Online is bijgewerkt — dan verschijnt hier weer de AI-conclusie op basis van Exact.
+              </p>
+            </div>
+          </div>
+        ) : <AINarratief jaar={data.jaar} />
+      )}
 
       {/* Doelen voortgang — TIJDELIJK UITGESCHAKELD (debug)
       {maandData.length > 0 && (

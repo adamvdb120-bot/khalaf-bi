@@ -77,9 +77,16 @@ interface Props {
    * Takenlijst doen zodat de net aangemaakte taak meteen zichtbaar is.
    */
   onTaskCreated?: () => void;
+  /**
+   * Bij een tijdelijke bankimport-bron negeren we de Exact-gebaseerde
+   * /api/notifications, zodat deze meldingen niet uit een andere bron komen
+   * dan de KPI's eronder. Er blijven dan alleen de lokaal-berekende alerts
+   * (uit de doorgegeven bankimport-pl/crediteuren) over.
+   */
+  negeerApiMeldingen?: boolean;
 }
 
-export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Props) {
+export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated, negeerApiMeldingen }: Props) {
   const [apiNotifications, setApiNotifications] = useState<Notification[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -125,6 +132,12 @@ export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Pr
 
   useEffect(() => {
     let cancelled = false;
+    // Bankimport-modus: geen Exact-meldingen ophalen — toon alleen lokale alerts.
+    if (negeerApiMeldingen) {
+      setApiNotifications([]);
+      setLoading(false);
+      return;
+    }
     async function load() {
       try {
         const res = await fetch("/api/notifications");
@@ -136,7 +149,8 @@ export default function WatVraagtAandacht({ pl, crediteuren, onTaskCreated }: Pr
       }
     }
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [negeerApiMeldingen]);
 
   // ─── Lokaal berekende meldingen uit door-de-parent doorgegeven data ────
   // Deze waarden komen uit dezelfde fetch (/api/exact/data) die ook de
