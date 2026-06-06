@@ -993,24 +993,30 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           {topCrediteuren.length > 0 && (
             <div className="card">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-navy-700">Openstaande crediteuren</h3>
+                <h3 className="font-bold text-navy-700">
+                  {bron === "bankimport" ? `Grootste leveranciers (betaald in ${data.jaar})` : "Openstaande crediteuren"}
+                </h3>
                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
                   {euro(topCrediteuren.reduce((s, d) => s + d.totaal, 0))} totaal
                 </span>
               </div>
-              <div className="flex gap-2 mb-3 text-[10px] text-gray-400">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-400 rounded-full inline-block"/>0–30d</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-yellow-400 rounded-full inline-block"/>31–60d</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-orange-400 rounded-full inline-block"/>61–90d</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500 rounded-full inline-block"/>&gt;90d</span>
-              </div>
+              {bron === "bankimport" ? (
+                <p className="text-[11px] text-gray-400 mb-3">Op basis van uitgaande betalingen uit de bankimport — geen openstaande facturen.</p>
+              ) : (
+                <div className="flex gap-2 mb-3 text-[10px] text-gray-400">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-400 rounded-full inline-block"/>0–30d</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-yellow-400 rounded-full inline-block"/>31–60d</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-orange-400 rounded-full inline-block"/>61–90d</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500 rounded-full inline-block"/>&gt;90d</span>
+                </div>
+              )}
               <div className="space-y-3">
                 {topCrediteuren.map((d, i) => (
                   <div key={d.Name} className="flex items-center gap-3">
                     <span className="w-5 h-5 rounded-full bg-gold-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                     <span className="text-sm text-navy-700 font-medium flex-1 truncate" title={d.Name}>{d.Name}</span>
-                    <AgedBar d={d} />
-                    <span className="font-bold text-orange-500 text-sm flex-shrink-0 w-20 text-right">{euro(d.totaal)}</span>
+                    {bron !== "bankimport" && <AgedBar d={d} />}
+                    <span className={`font-bold text-sm flex-shrink-0 w-20 text-right ${bron === "bankimport" ? "text-navy-700" : "text-orange-500"}`}>{euro(d.totaal)}</span>
                   </div>
                 ))}
               </div>
