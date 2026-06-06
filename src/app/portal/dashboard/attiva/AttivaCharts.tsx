@@ -131,6 +131,9 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
   const [cacheAge, setCacheAge] = useState<number | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [rapportOpen, setRapportOpen] = useState(false);
+  // Databron van het huidige jaar: "exact" (primair) of "bankimport" (tijdelijke
+  // bankbron die alleen inspringt als Exact voor dat jaar nog geen data heeft).
+  const [bron, setBron] = useState<"exact" | "bankimport">("exact");
 
   async function load(j: number, forceRefresh = false, isFallback = false) {
     setLoading(true);
@@ -148,15 +151,44 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
 
       const json = await res.json();
       const huidig = json.huidig ?? json;
-      const heeftData = huidig?.pl && huidig.pl.length > 0;
+      const exactPl = Array.isArray(huidig?.pl) ? huidig.pl : [];
+      const exactOmzet = exactPl
+        .filter((r: { IsRevenue?: boolean }) => r.IsRevenue)
+        .reduce((s: number, r: { Amount?: number }) => s + (r.Amount ?? 0), 0);
+      // "Exact compleet" = er is omzet geboekt voor dit jaar. Een jaar met alleen
+      // wat losse kosten (en €0 omzet) is nog niet bruikbaar → dan bankimport.
+      const exactCompleet = exactPl.length > 0 && exactOmzet > 0;
 
-      // Auto-fallback: geen data voor dit jaar → probeer vorig jaar
-      if (!heeftData && !isFallback && j > 2024) {
+      // Exact (nog) niet gevuld voor dit jaar → val terug op de aparte, tijdelijke
+      // bankimport-bron. Exact blijft primair: zodra Exact wél omzet heeft, neemt
+      // Exact het hier automatisch weer over.
+      if (!exactCompleet) {
+        try {
+          const bres = await fetch(`/api/attiva/bankdata?jaar=${j}`);
+          if (bres.ok) {
+            const bjson = await bres.json();
+            const bhuidig = bjson?.huidig ?? bjson;
+            if (bhuidig?.pl && bhuidig.pl.length > 0) {
+              setBron("bankimport");
+              setCacheStatus(null);
+              setCacheAge(null);
+              setData(bhuidig);
+              setVorigData(bjson.vorig ?? null);
+              setLastUpdated(new Date());
+              return;
+            }
+          }
+        } catch { /* negeer — val terug op de normale Exact-flow hieronder */ }
+      }
+
+      // Auto-fallback: geen Exact-omzet én geen bankimport → probeer vorig jaar
+      if (!exactCompleet && !isFallback && j > 2024) {
         setAutoFallback(j);
         setJaar(j - 1);
         return; // useEffect triggert load(j-1)
       }
 
+      setBron("exact");
       setData(huidig);
       setVorigData(json.vorig ?? null);
       setLastUpdated(new Date());
@@ -482,6 +514,15 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         </div>
         {/* Rechts: timestamp + knoppen */}
         <div className="flex items-center gap-3">
+          {bron === "bankimport" && (
+            <span
+              title="Deze cijfers komen tijdelijk uit een handmatige bankimport, niet uit Exact Online. Zodra dit jaar in Exact is geboekt, neemt Exact het automatisch weer over."
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Bron: bankimport · tijdelijk
+            </span>
+          )}
           <CacheBadge cacheStatus={cacheStatus} ageSeconds={cacheAge} />
           {lastUpdated && (
             <span className="text-xs text-gray-400 hidden sm:inline">
