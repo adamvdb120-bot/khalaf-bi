@@ -738,6 +738,16 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-navy-700 rounded-full transition-all" style={{ width: `${(aantalMaandenMetData / 12) * 100}%` }} />
           </div>
+
+          {/* Vooruitblik: nieuwe cliënten in aantocht — nog niet in de prognose verwerkt */}
+          <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-emerald-50 border border-emerald-100 px-3.5 py-3">
+            <TrendingUp size={15} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-emerald-800 leading-relaxed">
+              <span className="font-semibold">Nieuwe cliënten in aantocht.</span> Vanaf juni/juli worden naar verwachting
+              nieuwe cliënten goedgekeurd. Hun omzet is in deze prognose <span className="font-semibold">nog niet meegenomen</span> —
+              de werkelijke jaaromzet zal daardoor naar verwachting hoger uitvallen.
+            </p>
+          </div>
         </div>
       )}
 
