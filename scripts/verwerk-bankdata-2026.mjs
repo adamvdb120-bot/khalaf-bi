@@ -32,6 +32,10 @@ function classify(naam, med, soort, afbij, bedrag) {
   const t = (naam + " " + med + " " + soort).toLowerCase();
   const H = "hoog", M = "middel", L = "laag";
 
+  // Interne overboekingen / privé — geen omzet of kosten (beide richtingen)
+  if (/attiva zorg bv|altiva zorg bv/.test(t)) return { type: "intern", categorie: "Interne overboeking", zekerheid: M, toelichting: "Overboeking eigen onderneming" };
+  if (/bulhan/.test(t)) return { type: "privé", categorie: "Lening (privé)", zekerheid: M, toelichting: "Lening-gerelateerd (privé)" };
+
   // ── INKOMSTEN (Bij) ──
   if (afbij === "Bij") {
     if (/zorgkantoor|zilveren kruis|\bvgz\b|menzis|\bcz\b|zorgverzekeraar|\bsvb\b|sociale verzekeringsbank|\bpgb\b|\bzvw\b|\bwmo\b|\bcak\b|gemeente|jeugdwet|declarat|stagefonds/.test(t))
@@ -63,8 +67,13 @@ function classify(naam, med, soort, afbij, bedrag) {
   if (/albert heijn|\bah\b|jumbo|\blidl\b|\baldi\b|\bdirk\b|\bplus\b|\bspar\b|picnic|\bcrisp\b|kruidvat|boodschap/.test(t)) return { type: "kosten", categorie: "Eten / catering", zekerheid: "laag", toelichting: "Boodschappen — mogelijk privé" };
   if (/takeaway|thuisbezorg|mcdonald|burger|lunchroom|pizza|restaurant|\beet|\bcafe|café|kebab|shoarma|sushi|porto pescara|bumpy|johnny|benny|\bcoco\b|\bkfc\b|\bfebo\b|new york pizza|domino|subway|starbucks|la place|bagel|snackbar|grill|poke|\bwok\b|thai|chick/.test(t)) return { type: "kosten", categorie: "Eten / catering", zekerheid: "laag", toelichting: "Horeca/bezorg — mogelijk privé" };
   if (/marketing|reclame|advertentie|\bads\b|facebook|meta platforms|spark/.test(t)) return { type: "kosten", categorie: "Marketing", zekerheid: "middel", toelichting: "Marketing/reclame" };
+  if (/gemeente.*belasting|belastingen gem|gem\. amsterdam|waterschap|hoogheemraadschap/.test(t)) return { type: "kosten", categorie: "Belastingen", zekerheid: "middel", toelichting: "Gemeentelijke/lokale belasting" };
+  if (/carglass|autoservice|car ?rent|master car|\bapk\b|garage|bandencentrale|q-park|parkeer/.test(t)) return { type: "kosten", categorie: "Brandstof / vervoer", zekerheid: "laag", toelichting: "Auto/vervoer" };
+  if (/routevision|klachtenportaal|admin.?kantoor|boekhoud/.test(t)) return { type: "kosten", categorie: "Software / abonnementen", zekerheid: "laag", toelichting: "Software/zorg-administratie" };
   if (/\bggn\b|deurwaarder|incasso/.test(t)) return { type: "kosten", categorie: "Overige kosten", zekerheid: "laag", toelichting: "Incasso/deurwaarder — controleren" };
-  return { type: "onbekend", categorie: "Te controleren", zekerheid: "laag", toelichting: "Geen duidelijke categorie" };
+  // Resterende uitgaven zijn voor een zorgorganisatie vrijwel altijd betalingen aan
+  // zorgverleners/zzp'ers → 'Uitbesteed werk' (lage zekerheid, staat in controlelijst).
+  return { type: "kosten", categorie: "Uitbesteed werk", zekerheid: "laag", toelichting: "Vermoedelijk uitbesteed werk/zzp — controleren" };
 }
 
 // ── verwerken ──

@@ -559,21 +559,6 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         </div>
       )}
 
-      {/* Tijdelijke bankimport actief — maakt expliciet dat de narratieve/signaal-
-          blokken (klantgezondheid in de cockpit, sidebar-meldingen) nog op Exact
-          gebaseerd zijn, terwijl de cijfers hier uit de bankimport komen. */}
-      {bron === "bankimport" && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
-          <span>
-            <strong>Tijdelijke bankimport actief voor {jaar}.</strong> De KPI&apos;s, grafieken en
-            categorieën hieronder komen uit een handmatige verwerking van bankmutaties — geen
-            definitieve boekhouding. De klantgezondheid (cockpit) en algemene meldingen zijn nog
-            op Exact gebaseerd. Exact neemt automatisch over zodra {jaar} in Exact is geboekt.
-          </span>
-        </div>
-      )}
-
       {/* "Wat vraagt aandacht?" — komt na de filterbalk zodat duidelijk is
           dat deze meldingen over de geselecteerde periode gaan. Gebruikt
           dezelfde pl/crediteuren als de KPI-tegels eronder. Bij bankimport
