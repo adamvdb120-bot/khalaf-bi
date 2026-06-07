@@ -34,6 +34,12 @@ interface ExactData {
   crediteuren: Crediteur[] | null;
   crediteurenRaw?: RawFactuur[] | null;
 }
+interface LevResult {
+  jaar: number;
+  totaal: number;
+  aantalLeveranciers: number;
+  leveranciers: { naam: string; totaal: number }[];
+}
 
 function euro(v: number | string | undefined) {
   return `€ ${Number(v ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
@@ -79,6 +85,9 @@ export default function CrediteurenSection() {
   const [detailCred, setDetailCred] = useState<{ name: string; code: string } | null>(null);
   // "exact" = openstaande crediteuren (aging); "bankimport" = top leveranciers (betaald)
   const [bron, setBron] = useState<"exact" | "bankimport">("exact");
+  // Top leveranciers per jaar uit Exact (kosten per tegenpartij) + vorig jaar voor de vergelijking
+  const [lev, setLev] = useState<LevResult | null>(null);
+  const [levVorig, setLevVorig] = useState<LevResult | null>(null);
 
   async function load(j: number, forceRefresh = false) {
     setLoading(true);
@@ -109,6 +118,14 @@ export default function CrediteurenSection() {
         } catch { /* val terug op Exact */ }
       }
       setBron("exact");
+      // Top leveranciers per jaar uit Exact (huidig + vorig jaar voor de vergelijking).
+      // Best-effort: als de uitvraag faalt, valt de tab terug op de openstaande-crediteurenweergave.
+      const [levR, levVorigR] = await Promise.all([
+        fetch(`/api/exact/leveranciers-per-jaar?jaar=${j}${forceRefresh ? "&refresh=1" : ""}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/exact/leveranciers-per-jaar?jaar=${j - 1}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      setLev(levR && Array.isArray(levR.leveranciers) ? levR : null);
+      setLevVorig(levVorigR && Array.isArray(levVorigR.leveranciers) ? levVorigR : null);
       setData(huidig);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Onbekende fout");
@@ -248,6 +265,129 @@ export default function CrediteurenSection() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Exact-modus met leveranciers-data: top leveranciers + jaarvergelijking ──
+  if (bron === "exact" && lev && lev.leveranciers.length > 0) {
+    const top = lev.leveranciers.slice(0, 12);
+    const vorigMap = new Map((levVorig?.leveranciers ?? []).map(l => [l.naam, l.totaal]));
+    const yoy = lev.leveranciers.slice(0, 15).map(l => {
+      const v = vorigMap.get(l.naam) ?? 0;
+      return { naam: l.naam, nu: l.totaal, vorig: v, delta: l.totaal - v, deltaPct: v > 0 ? ((l.totaal - v) / v) * 100 : null };
+    });
+    const grootste = lev.leveranciers[0];
+    const totaalNu = lev.totaal;
+    const totaalVorig = levVorig?.totaal ?? 0;
+    const totaalDelta = totaalNu - totaalVorig;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-400">Jaar:</span>
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+              {JAREN.map(j => (
+                <button key={j} onClick={() => setJaar(j)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>{j}</button>
+              ))}
+            </div>
+          </div>
+          <button onClick={() => load(jaar, true)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+            <RefreshCw size={12} /> Vernieuwen
+          </button>
+        </div>
+
+        {/* KPI's */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="card border-t-4 border-t-navy-700">
+            <div className="w-9 h-9 bg-navy-700/10 rounded-xl flex items-center justify-center mb-3"><Wallet size={16} className="text-navy-700" /></div>
+            <p className="text-sm text-gray-400 mb-1">Totaal via leveranciers {jaar}</p>
+            <p className="text-2xl font-bold text-navy-700">{euro(totaalNu)}</p>
+            {totaalVorig > 0 && <p className="text-xs text-gray-400 mt-1">{jaar - 1}: {euro(totaalVorig)}</p>}
+          </div>
+          <div className="card border-t-4 border-t-gold-500">
+            <div className="w-9 h-9 bg-gold-500/10 rounded-xl flex items-center justify-center mb-3"><Users size={16} className="text-gold-500" /></div>
+            <p className="text-sm text-gray-400 mb-1">Aantal leveranciers</p>
+            <p className="text-2xl font-bold text-navy-700">{lev.aantalLeveranciers}</p>
+            {grootste && <p className="text-xs text-gray-400 mt-1 truncate" title={grootste.naam}>Grootste: {grootste.naam}</p>}
+          </div>
+          <div className={`card border-t-4 ${totaalDelta >= 0 ? "border-t-red-400" : "border-t-emerald-500"}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${totaalDelta >= 0 ? "bg-red-50" : "bg-emerald-50"}`}><AlertTriangle size={16} className={totaalDelta >= 0 ? "text-red-500" : "text-emerald-600"} /></div>
+            <p className="text-sm text-gray-400 mb-1">Verschil t.o.v. {jaar - 1}</p>
+            <p className={`text-2xl font-bold ${totaalDelta >= 0 ? "text-red-600" : "text-emerald-600"}`}>
+              {totaalVorig > 0 ? `${totaalDelta >= 0 ? "+" : "−"}${euro(Math.abs(totaalDelta))}` : "—"}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">meer kosten = rood</p>
+          </div>
+        </div>
+
+        {/* Bar chart */}
+        <div className="card">
+          <h3 className="font-bold text-navy-700 mb-1">Grootste leveranciers — {jaar}</h3>
+          <p className="text-xs text-gray-400 mb-4">Geboekte kosten per tegenpartij (Exact Online, grootboek 4000–7999)</p>
+          <ResponsiveContainer width="100%" height={Math.max(280, top.length * 42)}>
+            <BarChart data={top} layout="vertical" margin={{ left: 10, right: 30 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
+                tickFormatter={v => `€${(v / 1000).toFixed(0)}K`} />
+              <YAxis type="category" dataKey="naam" tick={{ fontSize: 11, fill: "#475569" }} axisLine={false} tickLine={false} width={150}
+                tickFormatter={(s: string) => s.length > 20 ? s.slice(0, 20) + "…" : s} />
+              <Tooltip formatter={(v) => euro(v as number)}
+                contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+              <Bar dataKey="totaal" fill="#1B3A5C" radius={[0, 5, 5, 0]} name="Geboekte kosten" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Jaarvergelijking */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-navy-700">Jaarvergelijking — {jaar - 1} vs {jaar}</h3>
+            <ExportButton
+              filename={`Attiva-Leveranciers-${jaar - 1}-vs-${jaar}`}
+              sheetName="Leveranciers"
+              rows={yoy.map((r, i) => ({
+                Rang: i + 1, Leverancier: r.naam,
+                [`${jaar - 1}`]: r.vorig, [`${jaar}`]: r.nu,
+                "Verschil (EUR)": r.delta,
+                "Verschil (%)": r.deltaPct !== null ? Math.round(r.deltaPct) : "",
+              }))}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mb-3">Top {yoy.length} leveranciers van {jaar}, met het bedrag van {jaar - 1} ernaast.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                  <th className="text-left font-medium pb-2 w-10">#</th>
+                  <th className="text-left font-medium pb-2">Leverancier</th>
+                  <th className="text-right font-medium pb-2">{jaar - 1}</th>
+                  <th className="text-right font-medium pb-2">{jaar}</th>
+                  <th className="text-right font-medium pb-2 pl-6">Verschil</th>
+                </tr>
+              </thead>
+              <tbody>
+                {yoy.map((r, i) => (
+                  <tr key={r.naam} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="py-2.5"><span className="w-5 h-5 rounded-full bg-navy-700 text-white text-[10px] font-bold inline-flex items-center justify-center">{i + 1}</span></td>
+                    <td className="py-2.5 font-medium text-navy-700">{r.naam}</td>
+                    <td className="py-2.5 text-right text-gray-500">{r.vorig > 0 ? euro(r.vorig) : "—"}</td>
+                    <td className="py-2.5 text-right font-semibold text-navy-700">{euro(r.nu)}</td>
+                    <td className={`py-2.5 text-right pl-6 font-semibold ${r.delta > 0 ? "text-red-600" : r.delta < 0 ? "text-emerald-600" : "text-gray-400"}`}>
+                      {r.vorig === 0
+                        ? "nieuw"
+                        : `${r.delta > 0 ? "+" : r.delta < 0 ? "−" : ""}${euro(Math.abs(r.delta))}${r.deltaPct !== null ? ` (${r.deltaPct >= 0 ? "+" : ""}${r.deltaPct.toFixed(0)}%)` : ""}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-3">Bron: kosten per tegenpartij uit Exact Online (geboekte bedragen per jaar).</p>
         </div>
       </div>
     );
