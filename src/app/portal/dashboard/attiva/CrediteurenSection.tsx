@@ -77,6 +77,8 @@ export default function CrediteurenSection() {
   const [jaar, setJaar] = useState<number>(HUIDIG_JAAR);
   const [pinnedRefresh, setPinnedRefresh] = useState(0);
   const [detailCred, setDetailCred] = useState<{ name: string; code: string } | null>(null);
+  // "exact" = openstaande crediteuren (aging); "bankimport" = top leveranciers (betaald)
+  const [bron, setBron] = useState<"exact" | "bankimport">("exact");
 
   async function load(j: number, forceRefresh = false) {
     setLoading(true);
@@ -88,6 +90,25 @@ export default function CrediteurenSection() {
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
       const huidig = json.huidig ?? json;
+      // Zelfde bron-logica als het Financieel-tab: heeft Exact geen omzet voor dit
+      // jaar, val terug op de tijdelijke bankimport (toont 'top leveranciers betaald').
+      const exactPl: { IsRevenue?: boolean; Amount?: number }[] = Array.isArray(huidig?.pl) ? huidig.pl : [];
+      const exactOmzet = exactPl.filter(r => r.IsRevenue).reduce((s, r) => s + (r.Amount ?? 0), 0);
+      if (exactPl.length === 0 || exactOmzet <= 0) {
+        try {
+          const bres = await fetch(`/api/attiva/bankdata?jaar=${j}`);
+          if (bres.ok) {
+            const bjson = await bres.json();
+            const bh = bjson?.huidig ?? bjson;
+            if (Array.isArray(bh?.crediteuren) && bh.crediteuren.length > 0) {
+              setBron("bankimport");
+              setData(bh);
+              return;
+            }
+          }
+        } catch { /* val terug op Exact */ }
+      }
+      setBron("exact");
       setData(huidig);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Onbekende fout");
@@ -127,6 +148,110 @@ export default function CrediteurenSection() {
   }
 
   if (!data) return null;
+
+  // ─── Bankimport-modus: top leveranciers (betaald), geen openstaande/aging ───
+  if (bron === "bankimport") {
+    const leveranciers = (data.crediteuren ?? [])
+      .map(c => ({ Name: c.Name, bedrag: totaal(c) }))
+      .filter(l => l.bedrag > 0)
+      .sort((a, b) => b.bedrag - a.bedrag);
+    const totaalBetaald = leveranciers.reduce((s, l) => s + l.bedrag, 0);
+    const grootste = leveranciers[0];
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-4 py-1.5">
+            <Wallet size={13} className="text-gray-500" />
+            <span className="text-sm text-gray-600">
+              Grootste leveranciers — <strong className="text-navy-700">betaald in {data.jaar}</strong>
+            </span>
+          </div>
+          <button onClick={() => load(data.jaar, true)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+            <RefreshCw size={12} /> Vernieuwen
+          </button>
+        </div>
+
+        {/* KPI's */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="card border-t-4 border-t-navy-700">
+            <div className="w-9 h-9 bg-navy-700/10 rounded-xl flex items-center justify-center mb-3"><Wallet size={16} className="text-navy-700" /></div>
+            <p className="text-sm text-gray-400 mb-1">Totaal betaald</p>
+            <p className="text-2xl font-bold text-navy-700">{euro(totaalBetaald)}</p>
+          </div>
+          <div className="card border-t-4 border-t-gold-500">
+            <div className="w-9 h-9 bg-gold-500/10 rounded-xl flex items-center justify-center mb-3"><Users size={16} className="text-gold-500" /></div>
+            <p className="text-sm text-gray-400 mb-1">Aantal leveranciers</p>
+            <p className="text-2xl font-bold text-navy-700">{leveranciers.length}</p>
+          </div>
+          <div className="card border-t-4 border-t-emerald-500">
+            <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center mb-3"><AlertTriangle size={16} className="text-emerald-600" /></div>
+            <p className="text-sm text-gray-400 mb-1">Grootste leverancier</p>
+            <p className="text-lg font-bold text-navy-700 truncate" title={grootste?.Name}>{grootste?.Name ?? "—"}</p>
+            <p className="text-xs text-gray-400 mt-1">{euro(grootste?.bedrag ?? 0)}</p>
+          </div>
+        </div>
+
+        {/* Bar chart */}
+        <div className="card">
+          <h3 className="font-bold text-navy-700 mb-1">Grootste leveranciers (betaald in {data.jaar})</h3>
+          <p className="text-xs text-gray-400 mb-4">Op basis van uitgaande betalingen uit de bankmutaties — geen openstaande facturen.</p>
+          <ResponsiveContainer width="100%" height={Math.max(280, leveranciers.length * 42)}>
+            <BarChart data={leveranciers} layout="vertical" margin={{ left: 10, right: 30 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
+                tickFormatter={v => `€${(v / 1000).toFixed(0)}K`} />
+              <YAxis type="category" dataKey="Name" tick={{ fontSize: 11, fill: "#475569" }} axisLine={false} tickLine={false} width={150}
+                tickFormatter={(s: string) => s.length > 20 ? s.slice(0, 20) + "…" : s} />
+              <Tooltip formatter={(v) => euro(v as number)}
+                contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+              <Bar dataKey="bedrag" fill="#1B3A5C" radius={[0, 5, 5, 0]} name="Betaald" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Tabel */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-navy-700">Alle leveranciers ({leveranciers.length})</h3>
+            <ExportButton
+              filename={`Attiva-Leveranciers-${data.jaar}`}
+              sheetName="Leveranciers"
+              rows={leveranciers.map((l, i) => ({ Rang: i + 1, Leverancier: l.Name, "Betaald in jaar": l.bedrag }))}
+            />
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                <th className="text-left font-medium pb-2 w-10">#</th>
+                <th className="text-left font-medium pb-2">Leverancier</th>
+                <th className="text-right font-medium pb-2">Betaald in {data.jaar}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leveranciers.map((l, i) => (
+                <tr key={l.Name} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <td className="py-2.5">
+                    <span className="w-5 h-5 rounded-full bg-navy-700 text-white text-[10px] font-bold inline-flex items-center justify-center">{i + 1}</span>
+                  </td>
+                  <td className="py-2.5 font-medium text-navy-700">{l.Name}</td>
+                  <td className="py-2.5 text-right font-bold text-navy-700">{euro(l.bedrag)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="font-bold text-navy-700">
+                <td />
+                <td className="pt-3">Totaal</td>
+                <td className="pt-3 text-right">{euro(totaalBetaald)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
 
   const crediteuren = (data.crediteuren ?? [])
     .map(c => ({ ...c, totaal: totaal(c) }))
