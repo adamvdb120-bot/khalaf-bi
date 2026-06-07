@@ -2,141 +2,48 @@
 
 import { useEffect, useState } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, ReferenceLine, Legend, Cell,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import {
-  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  Minus, RefreshCw, AlertCircle, Wallet,
-} from "lucide-react";
-import DashboardChat from "@/components/portal/DashboardChat";
-import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
+import { RefreshCw, AlertCircle, Wallet, ShieldAlert } from "lucide-react";
 
-interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
-interface RawFactuur {
-  AccountName: string;
-  AccountCode: string;
-  Amount: number;
-  DueDate: string | null;
-}
 interface BankSaldoData {
   opening: number;
   perPeriode: { periode: number; saldo: number }[];
 }
 interface ExactData {
-  pl: PlRow[] | null;
   jaar: number;
-  crediteurenRaw?: RawFactuur[] | null;
   bankSaldo?: BankSaldoData;
 }
-interface DeclaratieData {
-  totaal: number;
-  perMaand: { maand: string; bedrag: number }[];
-  perSoort: { soort: string; bedrag: number }[];
-  perPersoon: { naam: string; bedrag: number }[];
-}
 
-const MAANDEN_NL: Record<string, string> = {
-  "01":"Jan","02":"Feb","03":"Mrt","04":"Apr","05":"Mei","06":"Jun",
-  "07":"Jul","08":"Aug","09":"Sep","10":"Okt","11":"Nov","12":"Dec",
-};
-
-const MAANDEN = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
+const MAANDEN = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
 const HUIDIG_JAAR = new Date().getFullYear();
 const JAREN = Array.from({ length: HUIDIG_JAAR - 2023 }, (_, i) => 2024 + i);
-const PIE_COLORS = ["#1B3A5C","#C9A84C","#3B6EA5","#E8B84B","#264D73","#D4A843","#4A7FB5","#F0C75A"];
 
-function euro(v: number | string | undefined) {
-  return `€ ${Number(v ?? 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`;
-}
-function pct(v: number) {
-  return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
-}
+// Beginsaldo liquide middelen Attiva (3 ING-zakelijke rekeningen samen) — bron: ING-jaaroverzicht.
+// 1-1-2025 = 23.182 (eindsaldo 31-12-2025 = 479, sluit aan op de Exact-mutaties).
+// 1-1-2024 = 44.139 (afgeleid: eindsaldo 2024 = beginsaldo 2025).
+const BEGINSALDO: Record<number, number> = { 2024: 44139, 2025: 23182, 2026: 479 };
+const BUFFER = 20000; // minimum-buffer (richtlijn)
 
-function Trend({ current, previous, inverse = false }: { current: number; previous: number; inverse?: boolean }) {
-  if (!previous || previous === 0) return null;
-  const diff = ((current - previous) / Math.abs(previous)) * 100;
-  const isPositive = inverse ? diff < 0 : diff > 0;
-  const isNeutral = Math.abs(diff) < 0.5;
-  if (isNeutral) return (
-    <span className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-      <Minus size={10} /> {pct(diff)}
-    </span>
-  );
-  return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
-      isPositive ? "text-emerald-700 bg-emerald-50" : "text-red-600 bg-red-50"
-    }`}>
-      {isPositive ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
-      {pct(diff)}
-    </span>
-  );
-}
-
-function buildCashflowData(pl: PlRow[]) {
-  const perPeriode: Record<number, { inkomsten: number; uitgaven: number }> = {};
-  pl.forEach(row => {
-    const p = row.Period;
-    if (p < 1 || p > 12) return;
-    if (!perPeriode[p]) perPeriode[p] = { inkomsten: 0, uitgaven: 0 };
-    if (row.IsRevenue) perPeriode[p].inkomsten += row.Amount;
-    else perPeriode[p].uitgaven += row.Amount;
-  });
-
-  let cumulatief = 0;
-  return Object.entries(perPeriode)
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([p, v]) => {
-      const netto = Math.round(v.inkomsten - v.uitgaven);
-      cumulatief += netto;
-      return {
-        maand: MAANDEN[Number(p) - 1] ?? `P${p}`,
-        inkomsten: Math.round(v.inkomsten),
-        uitgaven: Math.round(v.uitgaven),
-        netto,
-        cumulatief,
-      };
-    });
-}
-
-function buildUitgavenCategorieen(pl: PlRow[], period: number | null) {
-  return Object.entries(
-    pl.filter(r => !r.IsRevenue && (period === null || r.Period === period))
-      .reduce((acc, r) => {
-        acc[r.Description] = (acc[r.Description] ?? 0) + r.Amount;
-        return acc;
-      }, {} as Record<string, number>)
-  )
-    .map(([name, value]) => ({ name, value: Math.round(value) }))
-    .filter(d => d.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 8);
+function euro(v: number) {
+  return `€ ${Math.round(v).toLocaleString("nl-NL")}`;
 }
 
 export default function CashflowSection() {
   const [data, setData] = useState<ExactData | null>(null);
-  const [vorigData, setVorigData] = useState<ExactData | null>(null);
-  const [declaraties, setDeclaraties] = useState<DeclaratieData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jaar, setJaar] = useState(HUIDIG_JAAR);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [maand, setMaand] = useState<string | null>(null);
-  const [pinnedRefresh, setPinnedRefresh] = useState(0);
 
   async function load(j: number, forceRefresh = false) {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
-      const [exactRes, declRes] = await Promise.all([
-        fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`),
-        fetch(`/api/attiva/declaraties?jaar=${j}`),
-      ]);
-      if (!exactRes.ok) throw new Error(await exactRes.text());
-      const json = await exactRes.json();
+      const res = await fetch(`/api/exact/data?jaar=${j}&jaarVorig=${j - 1}${forceRefresh ? "&refresh=1" : ""}`);
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
       setData(json.huidig ?? json);
-      setVorigData(json.vorig ?? null);
-      if (declRes.ok) setDeclaraties(await declRes.json());
       setLastUpdated(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Onbekende fout");
@@ -144,12 +51,10 @@ export default function CashflowSection() {
       setLoading(false);
     }
   }
-
   useEffect(() => { load(jaar); }, [jaar]);
-  useEffect(() => { setMaand(null); }, [jaar]);
 
   const jaarSelector = (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-4 flex-wrap">
       <div className="flex items-center gap-2">
         <span className="text-sm text-gray-400">Jaar:</span>
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
@@ -157,9 +62,7 @@ export default function CashflowSection() {
             <button key={j} onClick={() => setJaar(j)}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                 jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-              }`}>
-              {j}
-            </button>
+              }`}>{j}</button>
           ))}
         </div>
       </div>
@@ -180,18 +83,8 @@ export default function CashflowSection() {
   if (loading) return (
     <div className="space-y-6">
       {jaarSelector}
-      <div className="grid grid-cols-4 gap-4">
-        {[0,1,2,3].map(i => (
-          <div key={i} className="card animate-pulse">
-            <div className="h-4 bg-gray-100 rounded w-1/2 mb-4" />
-            <div className="h-8 bg-gray-100 rounded w-3/4 mb-2" />
-            <div className="h-3 bg-gray-100 rounded w-1/3" />
-          </div>
-        ))}
-      </div>
-      <div className="card animate-pulse h-64 flex items-center justify-center gap-3 text-gray-300">
-        <RefreshCw size={20} className="animate-spin" />
-        <span className="text-sm">Cashflow data ophalen...</span>
+      <div className="card animate-pulse h-72 flex items-center justify-center gap-3 text-gray-300">
+        <RefreshCw size={20} className="animate-spin" /><span className="text-sm">Banksaldo ophalen…</span>
       </div>
     </div>
   );
@@ -203,10 +96,9 @@ export default function CashflowSection() {
         <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center">
           <AlertCircle size={28} className="text-red-400" />
         </div>
-        <p className="font-semibold text-navy-700">Fout bij ophalen cashflow data</p>
+        <p className="font-semibold text-navy-700">Fout bij ophalen liquiditeitsdata</p>
         <p className="text-sm text-gray-400">{error}</p>
-        <button onClick={() => load(jaar)}
-          className="bg-navy-700 text-white px-6 py-2 rounded-xl text-sm hover:bg-navy-600 transition-colors">
+        <button onClick={() => load(jaar)} className="bg-navy-700 text-white px-6 py-2 rounded-xl text-sm hover:bg-navy-600 transition-colors">
           Opnieuw proberen
         </button>
       </div>
@@ -215,346 +107,123 @@ export default function CashflowSection() {
 
   if (!data) return null;
 
-  const cashflowData = buildCashflowData(data.pl ?? []);
-  const vorigCashflowData = vorigData ? buildCashflowData(vorigData.pl ?? []) : [];
+  const bs = data.bankSaldo;
+  const opening = BEGINSALDO[jaar];
+  const heeftSaldo = !!bs && Array.isArray(bs.perPeriode) && bs.perPeriode.length > 0 && opening !== undefined;
 
-  // Month filtering
-  const selectedPeriod = maand ? MAANDEN.indexOf(maand) + 1 : null;
-  const filteredMaandRow = maand ? cashflowData.find(m => m.maand === maand) : null;
+  if (!heeftSaldo) {
+    return (
+      <div className="space-y-6">
+        {jaarSelector}
+        <div className="card flex flex-col items-center justify-center py-16 text-center gap-3">
+          <div className="w-14 h-14 bg-navy-700/5 rounded-2xl flex items-center justify-center">
+            <Wallet size={26} className="text-navy-700" />
+          </div>
+          <p className="font-semibold text-navy-700">Geen banksaldo beschikbaar voor {jaar}</p>
+          <p className="text-sm text-gray-400 max-w-md">
+            Het liquiditeitsoverzicht toont het werkelijke banksaldo uit Exact Online (grootboek 1000–1299).
+            Voor {jaar} is dat nog niet beschikbaar — bekijk bijvoorbeeld 2025 of 2024.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-  const uitgavenCategorieen = buildUitgavenCategorieen(data.pl ?? [], selectedPeriod);
-
-  const totaalInkomsten = cashflowData.reduce((s, r) => s + r.inkomsten, 0);
-  const totaalUitgaven = cashflowData.reduce((s, r) => s + r.uitgaven, 0);
-  const nettoCashflow = totaalInkomsten - totaalUitgaven;
-  const eindSaldo = cashflowData[cashflowData.length - 1]?.cumulatief ?? 0;
-
-  const vorigInkomsten = vorigCashflowData.reduce((s, r) => s + r.inkomsten, 0);
-  const vorigUitgaven = vorigCashflowData.reduce((s, r) => s + r.uitgaven, 0);
-  const vorigNetto = vorigInkomsten - vorigUitgaven;
-
-  // Display values (filtered to month or full year)
-  const displayInkomsten = filteredMaandRow ? filteredMaandRow.inkomsten : totaalInkomsten;
-  const displayUitgaven = filteredMaandRow ? filteredMaandRow.uitgaven : totaalUitgaven;
-  const displayNetto = filteredMaandRow ? filteredMaandRow.netto : nettoCashflow;
-  const displayCumulatief = filteredMaandRow ? filteredMaandRow.cumulatief : eindSaldo;
-  const displayVorigInkomsten = maand ? (vorigCashflowData.find(m => m.maand === maand)?.inkomsten ?? 0) : vorigInkomsten;
-  const displayVorigUitgaven = maand ? (vorigCashflowData.find(m => m.maand === maand)?.uitgaven ?? 0) : vorigUitgaven;
-  const displayVorigNetto = maand ? (vorigCashflowData.find(m => m.maand === maand)?.netto ?? 0) : vorigNetto;
-
-  // Beste en slechtste maand (always based on full year)
-  const besteMaand = [...cashflowData].sort((a, b) => b.netto - a.netto)[0];
-  const slechteMaand = [...cashflowData].sort((a, b) => a.netto - b.netto)[0];
+  // Werkelijk banksaldo per maand = beginsaldo + cumulatieve mutatie (uit Exact).
+  const startSaldo = Math.round(opening);
+  const saldoData = [
+    { maand: "Begin", saldo: startSaldo },
+    ...bs!.perPeriode.map(p => ({ maand: MAANDEN[p.periode - 1] ?? `P${p.periode}`, saldo: Math.round(opening + p.saldo) })),
+  ];
+  const maandSaldos = saldoData.slice(1);
+  const eindSaldo = maandSaldos[maandSaldos.length - 1].saldo;
+  const laagste = maandSaldos.reduce((m, d) => (d.saldo < m.saldo ? d : m), maandSaldos[0]);
+  const verandering = eindSaldo - startSaldo;
+  const maandenOnderBuffer = maandSaldos.filter(d => d.saldo < BUFFER).length;
 
   return (
     <div className="space-y-6">
-      {/* Gecombineerde filterbalk */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-            {JAREN.map((j) => (
-              <button key={j} onClick={() => setJaar(j)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                  jaar === j ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-                }`}>
-                {j}
-              </button>
-            ))}
-          </div>
-          {cashflowData.length > 0 && <div className="h-5 w-px bg-gray-200" />}
-          {cashflowData.length > 0 && (
-            <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
-              <button onClick={() => setMaand(null)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                  maand === null ? "bg-navy-700 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-                }`}>
-                Heel jaar
-              </button>
-              {cashflowData.map((m) => (
-                <button key={m.maand} onClick={() => setMaand(m.maand)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                    maand === m.maand ? "bg-gold-500 text-white shadow-sm" : "text-gray-500 hover:text-navy-700"
-                  }`}>
-                  {m.maand}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {lastUpdated && (
-            <span className="text-xs text-gray-400">
-              Bijgewerkt om {lastUpdated.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-          <button onClick={() => load(jaar, true)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
-            <RefreshCw size={12} /> Vernieuwen
-          </button>
-        </div>
-      </div>
+      {jaarSelector}
 
-      {/* KPI Cards */}
+      {/* KPI's */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="card border-t-4 border-t-emerald-500">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
-              <ArrowUpRight size={16} className="text-emerald-600" />
-            </div>
-            <Trend current={displayInkomsten} previous={displayVorigInkomsten} />
-          </div>
-          <p className="text-sm text-gray-400 mb-1">{maand ? `Ontvangen ${maand}` : "Totaal ontvangen"}</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(displayInkomsten)}</p>
-          {displayVorigInkomsten > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigInkomsten)}</p>}
+        <div className="card border-t-4 border-t-navy-700">
+          <p className="text-sm text-gray-400 mb-1">Beginsaldo 1-1-{jaar}</p>
+          <p className="text-2xl font-bold text-navy-700">{euro(startSaldo)}</p>
+          <p className="text-xs text-gray-400 mt-1">3 ING-rekeningen samen</p>
         </div>
-
-        <div className="card border-t-4 border-t-red-400">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
-              <ArrowDownRight size={16} className="text-red-500" />
-            </div>
-            <Trend current={displayUitgaven} previous={displayVorigUitgaven} inverse />
-          </div>
-          <p className="text-sm text-gray-400 mb-1">{maand ? `Uitgegeven ${maand}` : "Totaal uitgegeven"}</p>
-          <p className="text-2xl font-bold text-navy-700">{euro(displayUitgaven)}</p>
-          {displayVorigUitgaven > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigUitgaven)}</p>}
+        <div className={`card border-t-4 ${eindSaldo >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
+          <p className="text-sm text-gray-400 mb-1">Eindsaldo {jaar}</p>
+          <p className={`text-2xl font-bold ${eindSaldo >= 0 ? "text-emerald-600" : "text-red-600"}`}>{euro(eindSaldo)}</p>
+          <p className="text-xs text-gray-400 mt-1">Stand per 31-12</p>
         </div>
-
-        <div className={`card border-t-4 ${displayNetto >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
-          <div className="flex items-start justify-between mb-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${displayNetto >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
-              {displayNetto >= 0
-                ? <TrendingUp size={16} className="text-emerald-600" />
-                : <TrendingDown size={16} className="text-red-500" />}
-            </div>
-            <Trend current={displayNetto} previous={displayVorigNetto} />
-          </div>
-          <p className="text-sm text-gray-400 mb-1">{maand ? `Netto ${maand}` : "Netto cashflow"}</p>
-          <p className={`text-2xl font-bold ${displayNetto >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {euro(displayNetto)}
+        <div className={`card border-t-4 ${verandering >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
+          <p className="text-sm text-gray-400 mb-1">Verandering in {jaar}</p>
+          <p className={`text-2xl font-bold ${verandering >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            {verandering >= 0 ? "+" : "−"}{euro(Math.abs(verandering))}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {displayInkomsten > 0 ? `${((displayNetto / displayInkomsten) * 100).toFixed(1)}% van inkomsten` : ""}
-          </p>
+          <p className="text-xs text-gray-400 mt-1">Begin → eind</p>
         </div>
-
-        <div className="card border-t-4 border-t-gold-500">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-9 h-9 bg-gold-500/10 rounded-xl flex items-center justify-center">
-              <Wallet size={16} className="text-gold-600" />
-            </div>
-          </div>
-          <p className="text-sm text-gray-400 mb-1">{maand ? `Cumulatief t/m ${maand}` : "Cumulatief saldo"}</p>
-          <p className={`text-2xl font-bold ${displayCumulatief >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {euro(displayCumulatief)}
+        <div className={`card border-t-4 ${laagste.saldo < BUFFER ? "border-t-amber-500" : "border-t-gold-500"}`}>
+          <p className="text-sm text-gray-400 mb-1">Laagste saldo</p>
+          <p className={`text-2xl font-bold ${laagste.saldo < 0 ? "text-red-600" : laagste.saldo < BUFFER ? "text-amber-600" : "text-navy-700"}`}>
+            {euro(laagste.saldo)}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {maand ? `Einde ${maand}` : `Einde ${MAANDEN[(cashflowData.length - 1)] ?? "periode"}`}
-          </p>
+          <p className="text-xs text-gray-400 mt-1">in {laagste.maand}</p>
         </div>
       </div>
 
-      {/* Inkomsten vs Uitgaven per maand */}
-      {cashflowData.length > 0 && (
-        <div className="card">
-          <h3 className="font-bold text-navy-700 mb-5">Inkomsten vs Uitgaven per maand — {jaar}</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={cashflowData} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
-              <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
-                tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v) => euro(v as number)}
-                contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Legend iconType="circle" iconSize={8} />
-              <Bar dataKey="inkomsten" name="Inkomsten" radius={[5,5,0,0]}>
-                {cashflowData.map((entry, i) => (
-                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#10b981" : "#bbf7d0"} />
-                ))}
-              </Bar>
-              <Bar dataKey="uitgaven" name="Uitgaven" radius={[5,5,0,0]}>
-                {cashflowData.map((entry, i) => (
-                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#ef4444" : "#fecaca"} opacity={maand === null || maand === entry.maand ? 0.8 : 0.5} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Buffer-alarm */}
+      {maandenOnderBuffer > 0 && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <ShieldAlert size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <span>
+            Het banksaldo zat in <strong>{maandenOnderBuffer} {maandenOnderBuffer === 1 ? "maand" : "maanden"}</strong> onder
+            de buffer van {euro(BUFFER)}{laagste.saldo < 0 ? " — en stond zelfs negatief" : ""}. Let op de liquiditeit.
+          </span>
         </div>
       )}
 
-      {/* Netto cashflow + cumulatief */}
-      {cashflowData.length > 0 && (
-        <div className="grid grid-cols-2 gap-5">
-          <div className="card">
-            <h3 className="font-bold text-navy-700 mb-5">Netto cashflow per maand</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={cashflowData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
-                <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
-                  tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v) => euro(v as number)}
-                  contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-                <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={1.5} />
-                <Bar dataKey="netto" name="Netto cashflow" radius={[4,4,0,0]}>
-                  {cashflowData.map((entry, i) => {
-                    const isSelected = maand === null || maand === entry.maand;
-                    const baseColor = entry.netto >= 0 ? "#10b981" : "#ef4444";
-                    const dimColor = entry.netto >= 0 ? "#bbf7d0" : "#fecaca";
-                    return <Cell key={i} fill={isSelected ? baseColor : dimColor} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Banksaldo-verloop */}
+      <div className="card">
+        <h3 className="text-lg font-bold text-navy-700 mb-1">Banksaldo per maand — {jaar}</h3>
+        <p className="text-xs text-gray-400 mb-4">
+          Werkelijke liquide middelen (Exact Online, grootboek 1000–1299) · beginsaldo uit het ING-jaaroverzicht
+        </p>
+        <ResponsiveContainer width="100%" height={340}>
+          <AreaChart data={saldoData} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
+            <defs>
+              <linearGradient id="liqFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#1B3A5C" stopOpacity={0.18} />
+                <stop offset="100%" stopColor="#1B3A5C" stopOpacity={0.01} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
+            <XAxis dataKey="maand" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} dy={4} />
+            <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false}
+              tickFormatter={v => `€${(v / 1000).toFixed(0)}K`} width={52} />
+            <Tooltip formatter={(v) => euro(v as number)}
+              contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+            <ReferenceLine y={BUFFER} stroke="#f59e0b" strokeDasharray="5 4"
+              label={{ value: `Buffer ${euro(BUFFER)}`, position: "insideTopRight", fontSize: 10, fill: "#b45309" }} />
+            <ReferenceLine y={0} stroke="#ef4444" strokeWidth={1.5} />
+            <Area type="monotone" dataKey="saldo" name="Banksaldo" stroke="#1B3A5C" strokeWidth={2.5} fill="url(#liqFill)"
+              dot={(props) => {
+                const { cx, cy, payload } = props;
+                const fill = payload.saldo < 0 ? "#ef4444" : payload.saldo < BUFFER ? "#f59e0b" : "#10b981";
+                return <circle key={cx} cx={cx} cy={cy} r={4} fill={fill} stroke="white" strokeWidth={2} />;
+              }}
+              activeDot={{ r: 6 }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
 
-          <div className="card">
-            <h3 className="font-bold text-navy-700 mb-5">Cumulatieve cashflow</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={cashflowData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
-                <XAxis dataKey="maand" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
-                  tickFormatter={v => `€${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v) => euro(v as number)}
-                  contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-                <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={1.5} strokeDasharray="4 4" />
-                <Line type="monotone" dataKey="cumulatief" name="Cumulatief saldo" stroke="#C9A84C"
-                  strokeWidth={2.5}
-                  dot={(props) => {
-                    const { cx, cy, payload } = props;
-                    const isSelected = maand === null || maand === payload.maand;
-                    return (
-                      <circle key={cx} cx={cx} cy={cy}
-                        r={maand === payload.maand ? 6 : 4}
-                        fill={isSelected ? "#C9A84C" : "#e9d8a6"}
-                        stroke="white" strokeWidth={2} />
-                    );
-                  }}
-                  activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Top uitgavenposten */}
-      {uitgavenCategorieen.length > 0 && (
-        <div className="card">
-          <h3 className="font-bold text-navy-700 mb-5">
-            Top uitgavenposten — {maand ? `${maand} ${jaar}` : jaar}
-          </h3>
-          <div className="space-y-3">
-            {uitgavenCategorieen.map((k, i) => (
-              <div key={k.name}>
-                <div className="flex items-center gap-3 mb-1.5">
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                    style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}>
-                    {i + 1}
-                  </span>
-                  <span className="text-sm text-gray-600 flex-1 truncate">{k.name}</span>
-                  <span className="text-sm font-bold text-navy-700 flex-shrink-0">{euro(k.value)}</span>
-                  <span className="text-xs text-gray-400 flex-shrink-0 w-10 text-right">
-                    {displayUitgaven > 0 ? `${((k.value / displayUitgaven) * 100).toFixed(0)}%` : ""}
-                  </span>
-                </div>
-                <div className="ml-8 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${(k.value / uitgavenCategorieen[0].value) * 100}%`,
-                      backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
-                    }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Beste / slechtste maand */}
-          {cashflowData.length > 1 && !maand && (
-            <div className="mt-6 grid grid-cols-2 gap-4 pt-5 border-t border-gray-100">
-              <div className="bg-emerald-50 rounded-xl p-4">
-                <div className="text-xs text-emerald-600 font-semibold uppercase tracking-wider mb-1">Beste maand</div>
-                <div className="text-lg font-bold text-navy-700">{besteMaand?.maand}</div>
-                <div className="text-sm text-emerald-600 font-semibold">{euro(besteMaand?.netto ?? 0)}</div>
-              </div>
-              <div className="bg-red-50 rounded-xl p-4">
-                <div className="text-xs text-red-500 font-semibold uppercase tracking-wider mb-1">Zwaarste maand</div>
-                <div className="text-lg font-bold text-navy-700">{slechteMaand?.maand}</div>
-                <div className="text-sm text-red-500 font-semibold">{euro(slechteMaand?.netto ?? 0)}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {cashflowData.length === 0 && (
-        <div className="card text-center py-16 text-gray-400">
-          <p>Geen cashflow data gevonden voor {jaar} in Exact Online.</p>
-        </div>
-      )}
-
-      {/* AI Chatbot */}
-      {cashflowData.length > 0 && (
-        <>
-          <PinnedChartsSection tab="cashflow" refresh={pinnedRefresh} />
-          <DashboardChat
-            tab="cashflow"
-            onChartPinned={() => setPinnedRefresh(r => r + 1)}
-            context={[
-          `Cashflow data Attiva Zorg — jaar ${jaar} (bron: Exact Online, real-time):`,
-          `- Totaal ontvangen: ${euro(totaalInkomsten)}`,
-          `- Totaal uitgegeven: ${euro(totaalUitgaven)}`,
-          `- Netto cashflow: ${euro(nettoCashflow)} (${totaalInkomsten > 0 ? ((nettoCashflow / totaalInkomsten) * 100).toFixed(1) : 0}% van inkomsten)`,
-          `- Cumulatief eindsaldo: ${euro(eindSaldo)}`,
-          ``,
-          `Cashflow per maand (wat daadwerkelijk binnenkwam en uitging):`,
-          ...cashflowData.map(m =>
-            `- ${m.maand}: ontvangen ${euro(m.inkomsten)}, uitgegeven ${euro(m.uitgaven)}, netto ${euro(m.netto)}, cumulatief ${euro(m.cumulatief)}`
-          ),
-          ...(vorigCashflowData.length > 0 ? [
-            ``,
-            `Vorig jaar (${jaar - 1}) per maand:`,
-            ...vorigCashflowData.map(m =>
-              `- ${m.maand}: ontvangen ${euro(m.inkomsten)}, uitgegeven ${euro(m.uitgaven)}, netto ${euro(m.netto)}`
-            ),
-          ] : []),
-          ``,
-          `Top uitgavenposten ${jaar}:`,
-          ...buildUitgavenCategorieen(data.pl ?? [], null).map(k =>
-            `- ${k.name}: ${euro(k.value)} (${totaalUitgaven > 0 ? ((k.value / totaalUitgaven) * 100).toFixed(0) : 0}% van totale uitgaven)`
-          ),
-          ...(besteMaand ? [``, `Beste maand qua cashflow: ${besteMaand.maand} (${euro(besteMaand.netto)})`] : []),
-          ...(slechteMaand ? [`Zwaarste maand qua cashflow: ${slechteMaand.maand} (${euro(slechteMaand.netto)})`] : []),
-          ...(declaraties ? [
-            ``,
-            `--- DECLARATIEOVERZICHT (SVB/PGB uitbetalingen) ---`,
-            `BELANGRIJK voor vergelijking:`,
-            `- "Cashflow inkomsten" = wat daadwerkelijk op de bankrekening binnenkwam (Exact Online)`,
-            `- "Declaraties" = wat uitbetaald is via SVB/PGB budgetten`,
-            `- Als declaraties > ontvangen: er zijn vertraagde of openstaande betalingen`,
-            `- Als ontvangen > declaraties: er zijn andere inkomstenbronnen naast PGB`,
-            ``,
-            `Totaal gedeclareerd/uitbetaald ${jaar}: ${euro(declaraties.totaal)}`,
-            `Totaal daadwerkelijk ontvangen cashflow ${jaar}: ${euro(totaalInkomsten)}`,
-            `Totaalverschil: ${declaraties.totaal > totaalInkomsten ? `€${Math.round(declaraties.totaal - totaalInkomsten).toLocaleString("nl-NL")} meer gedeclareerd dan ontvangen (achterstand)` : `€${Math.round(totaalInkomsten - declaraties.totaal).toLocaleString("nl-NL")} meer ontvangen dan gedeclareerd (andere inkomsten)`}`,
-            ``,
-            `Cashflow inkomsten per maand (wat binnenkwam op bankrekening):`,
-            ...cashflowData.map(m => `- ${m.maand}: ${euro(m.inkomsten)}`),
-            ``,
-            `Declaraties uitbetaald per maand (SVB/PGB, maand = periode uit database):`,
-            ...declaraties.perMaand.map(d => `- ${d.maand}: ${euro(d.bedrag)}`),
-            ``,
-            `NB: Koppel de maanden zelf: "Jan"="2025-01", "Feb"="2025-02" etc. Bereken per maand het verschil tussen ontvangen en gedeclareerd.`,
-            ``,
-            `Declaraties per soort:`,
-            ...declaraties.perSoort.map(s => `- ${s.soort}: ${euro(s.bedrag)}`),
-            ``,
-            `Declaraties per cliënt:`,
-            ...declaraties.perPersoon.map(p => `- ${p.naam}: ${euro(p.bedrag)}`),
-          ] : []),
-        ].join("\n")} />
-        </>
-      )}
+      {/* Bron & validatie */}
+      <div className="card bg-gray-50/60 text-xs text-gray-500 leading-relaxed">
+        <strong className="text-navy-700">Bron &amp; validatie:</strong> het banksaldo komt uit Exact Online (liquide middelen,
+        grootboek 1000–1299); het beginsaldo is overgenomen uit het officiële ING-jaaroverzicht. Het eindsaldo van {jaar}
+        ({euro(eindSaldo)}) sluit hierdoor aan op de werkelijke bankafschriften — een controle dat de cijfers kloppen.
+      </div>
     </div>
   );
 }

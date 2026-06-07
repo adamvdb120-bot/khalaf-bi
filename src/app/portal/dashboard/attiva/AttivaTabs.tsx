@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart2, FileText, TrendingUp, Wallet } from "lucide-react";
+import { BarChart2, FileText, Landmark, Wallet } from "lucide-react";
 import AttivaCharts from "./AttivaCharts";
 import DeclaratiesSection from "./DeclaratiesSection";
 import CashflowSection from "./CashflowSection";
@@ -11,7 +11,7 @@ import { CLIENTS, type DashboardTabId } from "@/lib/clients/config";
 
 const TAB_DEFS: { id: DashboardTabId; label: string; icon: typeof BarChart2 }[] = [
   { id: "financieel", label: "Financieel overzicht", icon: BarChart2 },
-  { id: "cashflow", label: "Cashflow", icon: TrendingUp },
+  { id: "cashflow", label: "Liquiditeit", icon: Landmark },
   { id: "crediteuren", label: "Crediteuren", icon: Wallet },
   { id: "declaraties", label: "Declaratieoverzicht", icon: FileText },
 ];
@@ -125,12 +125,12 @@ export default function AttivaTabs({ isConnected }: { isConnected: boolean }) {
         isConnected ? <CashflowSection /> : (
           <div className="card text-center py-20 space-y-6">
             <div className="w-16 h-16 bg-navy-700/5 rounded-2xl flex items-center justify-center mx-auto">
-              <TrendingUp size={28} className="text-navy-700" />
+              <Landmark size={28} className="text-navy-700" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-navy-700 mb-2">Koppel Exact Online</h2>
               <p className="text-gray-400 text-sm max-w-md mx-auto">
-                Verbind Exact Online met dit dashboard om cashflow gegevens te bekijken.
+                Verbind Exact Online met dit dashboard om het liquiditeitsoverzicht te bekijken.
               </p>
             </div>
             <a href="/api/exact/auth"

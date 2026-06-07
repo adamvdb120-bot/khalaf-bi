@@ -41,7 +41,7 @@ export const CLIENTS: Record<ClientSlug, ClientConfig> = {
     features: {
       tabs: {
         financieel: true,
-        cashflow: false, // verborgen: overlapte met Financieel overzicht (component blijft bestaan)
+        cashflow: true, // hergebruikt als 'Liquiditeit'-tab (werkelijk banksaldo uit Exact)
         crediteuren: true,
         declaraties: true,
       },
