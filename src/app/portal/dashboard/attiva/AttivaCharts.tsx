@@ -389,11 +389,22 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
     ] : []),
   ];
 
-  const vergelijkData = MAANDEN.map((m) => ({
-    maand: m,
-    [`omzet${jaar}`]: maandData.find(r => r.maand === m)?.omzet ?? 0,
-    [`omzet${jaar - 1}`]: vorigMaandData.find(r => r.maand === m)?.omzet ?? 0,
-  })).filter(r => (r[`omzet${jaar}`] as number) > 0 || (r[`omzet${jaar - 1}`] as number) > 0);
+  // Omzetvergelijking: huidig jaar gesplitst in gerealiseerd (maanden mét data) en
+  // prognose (maanden zónder data = gemiddelde van de gerealiseerde maanden).
+  const vergelijkData = MAANDEN.map((m) => {
+    const real = maandData.find(r => r.maand === m);
+    const heeftReal = !!real;
+    return {
+      maand: m,
+      [`omzet${jaar - 1}`]: vorigMaandData.find(r => r.maand === m)?.omzet ?? 0,
+      [`omzet${jaar}Real`]: heeftReal ? (real?.omzet ?? 0) : 0,
+      [`omzet${jaar}Prog`]: (!heeftReal && toonPrognose) ? Math.round(gemOmzetPerMaand) : 0,
+    };
+  }).filter(r =>
+    (r[`omzet${jaar}Real`] as number) > 0 ||
+    (r[`omzet${jaar}Prog`] as number) > 0 ||
+    (r[`omzet${jaar - 1}`] as number) > 0
+  );
 
   const kostenPerCategorie = Object.entries(
     (data.pl ?? [])
@@ -841,7 +852,14 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
       {vergelijkData.length > 0 && vorigMaandData.length > 0 && (
         <div className="card">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold text-navy-700">Omzetvergelijking — {jaar - 1} vs {jaar}</h3>
+            <div>
+              <h3 className="font-bold text-navy-700">Omzetvergelijking — {jaar - 1} vs {jaar}</h3>
+              {toonPrognose && (
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  {jaar}: t/m maand {aantalMaandenMetData} gerealiseerd · daarna prognose (gemiddelde van de gerealiseerde maanden)
+                </p>
+              )}
+            </div>
             {vorigOmzet > 0 && (
               <div className="flex items-center gap-1.5 text-sm">
                 <Trend current={totaalOmzet} previous={vorigOmzet} />
@@ -856,16 +874,11 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
               <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}K`} width={52} />
               <Tooltip formatter={(v) => euro(v as number)} contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
               <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 13, paddingTop: 8 }} />
-              <Bar dataKey={`omzet${jaar - 1}`} name={`${jaar - 1}`} fill="#cbd5e1" radius={[5,5,0,0]}>
-                {vergelijkData.map((entry, i) => (
-                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#cbd5e1" : "#e9ecef"} />
-                ))}
-              </Bar>
-              <Bar dataKey={`omzet${jaar}`} name={`${jaar}`} fill="#1B3A5C" radius={[5,5,0,0]}>
-                {vergelijkData.map((entry, i) => (
-                  <Cell key={i} fill={maand === null || maand === entry.maand ? "#1B3A5C" : "#d1d5db"} />
-                ))}
-              </Bar>
+              <Bar dataKey={`omzet${jaar - 1}`} name={`${jaar - 1}`} fill="#cbd5e1" radius={[5,5,0,0]} />
+              <Bar dataKey={`omzet${jaar}Real`} name={toonPrognose ? `${jaar} gerealiseerd` : `${jaar}`} stackId="huidig" fill="#1B3A5C" radius={[5,5,0,0]} />
+              {toonPrognose && (
+                <Bar dataKey={`omzet${jaar}Prog`} name={`${jaar} prognose`} stackId="huidig" fill="#9db8d8" radius={[5,5,0,0]} />
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
