@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell, LineChart, Line, ReferenceLine,
 } from "recharts";
-import { TrendingUp, TrendingDown, Euro, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Euro, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight, Minus, Sparkles } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
 import DownloadPDFButton from "@/components/portal/DownloadPDFButton";
@@ -525,15 +525,6 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
         </div>
         {/* Rechts: timestamp + knoppen */}
         <div className="flex items-center gap-3">
-          {bron === "bankimport" && (
-            <span
-              title="Deze cijfers komen tijdelijk uit een handmatige bankimport, niet uit Exact Online. Zodra dit jaar in Exact is geboekt, neemt Exact het automatisch weer over."
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              Bron: bankimport · tijdelijk
-            </span>
-          )}
           <CacheBadge cacheStatus={cacheStatus} ageSeconds={cacheAge} />
           {lastUpdated && (
             <span className="text-xs text-gray-400 hidden sm:inline">
@@ -596,16 +587,16 @@ export default function AttivaCharts({ onNavigate }: { onNavigate?: NavigateFn }
           die niet bij de bankimport-KPI's passen (mismatch). Vaste disclaimer i.p.v. */}
       {maandData.length > 0 && (
         bron === "bankimport" ? (
-          <div className="bg-white border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-              <AlertCircle size={16} className="text-amber-600" />
+          <div className="bg-white border border-gray-200/70 rounded-2xl p-5 flex items-start gap-4">
+            <div className="w-9 h-9 rounded-xl bg-navy-700/8 flex items-center justify-center flex-shrink-0">
+              <Sparkles size={15} className="text-navy-700" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-navy-700 mb-1">Wat betekent dit?</h3>
               <p className="text-sm text-gray-700 leading-relaxed">
-                Deze {jaar}-cijfers zijn gebaseerd op een tijdelijke bankimport. De automatische
-                analyse en boekhoudkundige signalen worden pas volledig betrouwbaar zodra {jaar} in
-                Exact Online is bijgewerkt — dan verschijnt hier weer de AI-conclusie op basis van Exact.
+                De automatische AI-conclusie voor {jaar} verschijnt zodra het jaar volledig in
+                Exact Online is bijgewerkt. Bekijk hierboven de KPI&apos;s en hieronder de grafieken
+                en categorieën voor het beeld tot nu toe.
               </p>
             </div>
           </div>
