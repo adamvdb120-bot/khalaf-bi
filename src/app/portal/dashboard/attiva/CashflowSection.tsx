@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import DashboardChat from "@/components/portal/DashboardChat";
 import PinnedChartsSection from "@/components/portal/PinnedChartsSection";
-import CashflowForecast from "@/components/portal/CashflowForecast";
 
 interface PlRow { Amount: number; Description: string; Period: number; IsRevenue: boolean }
 interface RawFactuur {
@@ -321,17 +320,17 @@ export default function CashflowSection() {
           {displayVorigUitgaven > 0 && <p className="text-xs text-gray-400 mt-1">Vorig jaar: {euro(displayVorigUitgaven)}</p>}
         </div>
 
-        <div className={`card border-t-4 ${displayNetto >= 0 ? "border-t-navy-700" : "border-t-orange-500"}`}>
+        <div className={`card border-t-4 ${displayNetto >= 0 ? "border-t-emerald-500" : "border-t-red-500"}`}>
           <div className="flex items-start justify-between mb-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${displayNetto >= 0 ? "bg-navy-700/10" : "bg-orange-50"}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${displayNetto >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
               {displayNetto >= 0
-                ? <TrendingUp size={16} className="text-navy-700" />
-                : <TrendingDown size={16} className="text-orange-500" />}
+                ? <TrendingUp size={16} className="text-emerald-600" />
+                : <TrendingDown size={16} className="text-red-500" />}
             </div>
             <Trend current={displayNetto} previous={displayVorigNetto} />
           </div>
           <p className="text-sm text-gray-400 mb-1">{maand ? `Netto ${maand}` : "Netto cashflow"}</p>
-          <p className={`text-2xl font-bold ${displayNetto >= 0 ? "text-navy-700" : "text-orange-500"}`}>
+          <p className={`text-2xl font-bold ${displayNetto >= 0 ? "text-emerald-600" : "text-red-600"}`}>
             {euro(displayNetto)}
           </p>
           <p className="text-xs text-gray-400 mt-1">
@@ -354,17 +353,6 @@ export default function CashflowSection() {
           </p>
         </div>
       </div>
-
-      {/* Cashflow voorspelling 6 maanden vooruit */}
-      {cashflowData.length > 0 && (
-        <CashflowForecast
-          pl={data.pl ?? []}
-          plVorig={vorigData?.pl ?? []}
-          crediteurenRaw={data.crediteurenRaw ?? []}
-          bankSaldo={data.bankSaldo}
-          jaar={jaar}
-        />
-      )}
 
       {/* Inkomsten vs Uitgaven per maand */}
       {cashflowData.length > 0 && (
@@ -411,8 +399,8 @@ export default function CashflowSection() {
                 <Bar dataKey="netto" name="Netto cashflow" radius={[4,4,0,0]}>
                   {cashflowData.map((entry, i) => {
                     const isSelected = maand === null || maand === entry.maand;
-                    const baseColor = entry.netto >= 0 ? "#1B3A5C" : "#ef4444";
-                    const dimColor = entry.netto >= 0 ? "#cbd5e1" : "#fecaca";
+                    const baseColor = entry.netto >= 0 ? "#10b981" : "#ef4444";
+                    const dimColor = entry.netto >= 0 ? "#bbf7d0" : "#fecaca";
                     return <Cell key={i} fill={isSelected ? baseColor : dimColor} />;
                   })}
                 </Bar>
